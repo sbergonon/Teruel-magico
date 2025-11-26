@@ -117,9 +117,26 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
   const routeLayer = useRef<L.Polyline | null>(null);
   const [mapReady, setMapReady] = useState(false);
   
-  // Derived state
-  const currentDay = itinerary.days.find(d => d.dayNumber === dayNumber) || itinerary.days[0];
-  const activities = currentDay.activities;
+  // Safeguard: Ensure itinerary.days exists and has content
+  const days = itinerary.days || [];
+  const currentDay = days.find(d => d.dayNumber === dayNumber) || days[0];
+  
+  // If no currentDay (empty itinerary), render error state to prevent crash
+  if (!currentDay) {
+      return (
+          <div className="flex flex-col h-screen items-center justify-center bg-teruel-stone p-8 text-center">
+              <div className="bg-white p-8 rounded-lg shadow-xl border-t-4 border-teruel-red max-w-md">
+                  <h3 className="text-xl font-serif font-bold text-teruel-dark mb-4">Error loading itinerary data</h3>
+                  <p className="text-gray-600 mb-6">The generated itinerary seems to be empty or incomplete. Please try generating again.</p>
+                  <button onClick={onReset} className="px-6 py-2 bg-teruel-ochre text-white font-bold rounded-full hover:bg-yellow-600 transition-colors">
+                      {t('view.back')}
+                  </button>
+              </div>
+          </div>
+      );
+  }
+
+  const activities = currentDay.activities || []; // Default to empty array
   const hasCoordinates = activities.some(a => a.coordinates);
 
   const fetchedAddresses: Record<string, string> = {}; // Placeholder for geocoding results
@@ -165,11 +182,6 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
   }, [isMapView, mapReady]);
 
   const onMarkerClick = useCallback((index: number) => {
-      // If full map view, switch to list to show details? 
-      // Or just highlight? If full map view, we might want to stay there and use popups.
-      // But if user wants list, we should probably auto-switch on mobile?
-      // For now, we rely on the popup content.
-      
       // Expand the item in list
       setExpandedActivities(prev => ({ ...prev, [index]: true }));
 
@@ -206,7 +218,7 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
 
       itinerary.days.forEach(d => {
           body += `--- ${t('view.day').toUpperCase()} ${d.dayNumber}: ${d.title} ---\n\n`;
-          d.activities.forEach(a => {
+          (d.activities || []).forEach(a => {
               body += `• ${a.time} - ${a.placeName}\n`;
               body += `  ${a.description}\n`;
               if (a.address) body += `  📍 ${a.address}\n`;
@@ -615,7 +627,7 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
         map.setView([40.345, -1.106], 9);
     }
     
-  }, [activities, filters, isOnline, onMarkerClick, t, fetchedAddresses, comments, dayNumber, saveComment, mapReady, language, searchQuery]);
+  }, [activities, filters, isOnline, onMarkerClick, t, fetchedAddresses, comments, dayNumber, saveComment, mapReady, language, searchQuery, currentMapStyle]);
 
   return (
     <div className="flex flex-col h-full bg-teruel-stone min-h-[80vh]">
@@ -665,7 +677,7 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
         {/* Days Navigation */}
         <div className="bg-teruel-dark text-teruel-ochre p-2 overflow-x-auto whitespace-nowrap text-center shadow-inner">
             <div className="inline-flex space-x-2">
-                {itinerary.days.map(d => (
+                {(itinerary.days || []).map(d => (
                     <button 
                         key={d.dayNumber}
                         onClick={() => setDayNumber(d.dayNumber)}
@@ -862,37 +874,42 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
                     </div>
 
                     {/* Layer Control Button */}
-                    <button 
-                        onClick={() => setShowLayerControl(!showLayerControl)}
-                        className="bg-white p-2 rounded shadow-md hover:bg-gray-100 text-teruel-dark border border-gray-300 transition-colors"
-                        title={t('view.layers_title')}
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                        </svg>
-                    </button>
-                    
-                    {showLayerControl && (
-                        <div className="mt-2 bg-white rounded shadow-xl p-2 min-w-[150px] animate-fade-in flex flex-col gap-1 border border-gray-200">
-                            {(Object.keys(MAP_STYLES) as MapStyle[]).map((style) => (
-                                <button
-                                    key={style}
-                                    onClick={() => {
-                                        setCurrentMapStyle(style);
-                                        setShowLayerControl(false);
-                                    }}
-                                    className={`text-left px-3 py-2 text-sm rounded transition-colors flex items-center gap-2 ${
-                                        currentMapStyle === style 
-                                        ? 'bg-teruel-ochre text-white font-bold' 
-                                        : 'hover:bg-gray-100 text-gray-700'
-                                    }`}
-                                >
-                                    <span className={`w-2 h-2 rounded-full ${currentMapStyle === style ? 'bg-white' : 'bg-gray-400'}`}></span>
-                                    {t(MAP_STYLES[style].nameKey)}
-                                </button>
-                            ))}
-                        </div>
-                    )}
+                    <div className="relative">
+                        <button 
+                            onClick={() => setShowLayerControl(!showLayerControl)}
+                            className="bg-white p-2 rounded shadow-md hover:bg-gray-100 text-teruel-dark border border-gray-300 transition-colors flex items-center justify-center w-10 h-10"
+                            title={t('view.layers_title')}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                            </svg>
+                        </button>
+                        
+                        {showLayerControl && (
+                            <div className="absolute right-0 top-12 bg-white rounded shadow-xl p-1 min-w-[160px] animate-fade-in flex flex-col gap-1 border border-gray-200 z-[600]">
+                                <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wide border-b border-gray-100 mb-1">
+                                    {language === 'es' ? 'Tipo de Mapa' : 'Map Type'}
+                                </div>
+                                {(Object.keys(MAP_STYLES) as MapStyle[]).map((style) => (
+                                    <button
+                                        key={style}
+                                        onClick={() => {
+                                            setCurrentMapStyle(style);
+                                            setShowLayerControl(false);
+                                        }}
+                                        className={`text-left px-3 py-2 text-sm rounded transition-colors flex items-center gap-2 ${
+                                            currentMapStyle === style 
+                                            ? 'bg-teruel-ochre text-white font-bold' 
+                                            : 'hover:bg-gray-100 text-gray-700'
+                                        }`}
+                                    >
+                                        <div className={`w-3 h-3 rounded-full border border-white ${currentMapStyle === style ? 'bg-white' : 'bg-gray-300'}`}></div>
+                                        {t(MAP_STYLES[style].nameKey)}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {!hasCoordinates && (
