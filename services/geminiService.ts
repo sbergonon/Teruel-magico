@@ -58,7 +58,9 @@ export const generateItinerary = async (prefs: UserPreferences): Promise<Itinera
   const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : '';
   
   if (!apiKey) {
-      console.warn("API_KEY not found in process.env");
+      console.error("API_KEY not found in process.env. Check your build configuration.");
+      // Throwing a specific error allows the UI to show a configuration warning instead of a network error
+      throw new Error("API Key not configured. Please check your environment variables.");
   }
 
   const ai = new GoogleGenAI({ apiKey: apiKey });

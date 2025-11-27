@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { TripForm } from './components/TripForm';
@@ -47,7 +46,7 @@ const AppContent: React.FC = () => {
       itineraryWithDate = { ...newItinerary }; // Keep existing timestamp
       updatedHistory = [...savedItineraries];
       updatedHistory[existingIndex] = itineraryWithDate;
-      // Move to top? Optional, let's keep order or move to top. Let's move to top.
+      // Move to top
       updatedHistory.splice(existingIndex, 1);
       updatedHistory.unshift(itineraryWithDate);
     } else {
@@ -75,8 +74,17 @@ const AppContent: React.FC = () => {
       const result = await generateItinerary(prefs);
       setItinerary(result);
     } catch (e) {
-      setError(t('error.generate'));
-      console.error(e);
+      console.error("Generation error caught in App:", e);
+      // Determine if it's a config error or a generic one
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      
+      if (errorMessage.includes("API Key") || errorMessage.includes("configured")) {
+          // Show specific config error
+          setError(`Configuration Error: ${errorMessage}`);
+      } else {
+          // Show generic user friendly error
+          setError(t('error.generate'));
+      }
     } finally {
       setLoading(false);
     }
@@ -127,8 +135,9 @@ const AppContent: React.FC = () => {
               <TripForm isLoading={loading} onSubmit={handleGenerate} />
               
               {error && (
-                <div className="max-w-2xl mx-auto mt-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded text-center">
-                  {error}
+                <div className="max-w-2xl mx-auto mt-6 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded text-center shadow-sm">
+                  <p className="font-bold">Error</p>
+                  <p>{error}</p>
                 </div>
               )}
 
