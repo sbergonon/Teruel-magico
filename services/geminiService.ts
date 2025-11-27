@@ -54,7 +54,14 @@ const itinerarySchema = {
 
 export const generateItinerary = async (prefs: UserPreferences): Promise<ItineraryResult> => {
   // Initialize AI client only when called to prevent load-time errors
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Safe access to process.env for browser environments
+  const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : '';
+  
+  if (!apiKey) {
+      console.warn("API_KEY not found in process.env");
+  }
+
+  const ai = new GoogleGenAI({ apiKey: apiKey });
   const model = "gemini-2.5-flash";
   
   // Language-specific instruction
