@@ -53,48 +53,32 @@ const itinerarySchema = {
 };
 
 export const generateItinerary = async (prefs: UserPreferences): Promise<ItineraryResult> => {
+  // Explicitly check known variable names so bundlers (Vite/Webpack) can replace them statically.
+  // Dynamic access (process.env[key]) fails in modern bundlers.
   let apiKey = '';
-  
-  // Robustly attempt to find the API Key in various environments (Vite, Webpack, Node)
-  const candidates = [
-    'API_KEY', 
-    'VITE_API_KEY', 
-    'REACT_APP_API_KEY', 
-    'VITE_GEMINI_API_KEY'
-  ];
 
-  const getEnvVar = (key: string): string | undefined => {
-    // Try import.meta.env (Vite standard)
-    try {
+  try {
+    // 1. Standard Node/Webpack check
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env) {
       // @ts-ignore
-      if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
-        // @ts-ignore
-        return import.meta.env[key];
-      }
-    } catch(e) {}
-
-    // Try process.env (Webpack / Node standard)
-    try {
-      // @ts-ignore
-      if (typeof process !== 'undefined' && process.env && process.env[key]) {
-        // @ts-ignore
-        return process.env[key];
-      }
-    } catch(e) {}
-    
-    return undefined;
-  };
-
-  for (const key of candidates) {
-    const val = getEnvVar(key);
-    if (val) {
-      apiKey = val;
-      break;
+      apiKey = process.env.API_KEY || process.env.VITE_API_KEY || process.env.REACT_APP_API_KEY || process.env.VITE_GEMINI_API_KEY;
     }
+  } catch (e) {}
+
+  // 2. Vite specific check (import.meta.env)
+  if (!apiKey) {
+    try {
+      // @ts-ignore
+      if (typeof import.meta !== 'undefined' && import.meta.env) {
+        // @ts-ignore
+        apiKey = import.meta.env.API_KEY || import.meta.env.VITE_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+      }
+    } catch (e) {}
   }
 
   if (!apiKey) {
-      console.error("Available env vars check failed. Please ensure API_KEY (or VITE_API_KEY) is set in your build/deployment environment.");
+      console.error("API Key check failed. Ensure variables are set in Render/Vite.");
       throw new Error("Configuration Error: API Key not configured. Please ensure 'API_KEY' (or 'VITE_API_KEY') is set in your environment variables.");
   }
 
