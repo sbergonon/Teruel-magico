@@ -1,8 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { UserPreferences, ItineraryResult } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
+// Schema definition remains static
 const itinerarySchema = {
   type: Type.OBJECT,
   properties: {
@@ -54,6 +53,8 @@ const itinerarySchema = {
 };
 
 export const generateItinerary = async (prefs: UserPreferences): Promise<ItineraryResult> => {
+  // Initialize AI client only when called to prevent load-time errors
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = "gemini-2.5-flash";
   
   // Language-specific instruction
