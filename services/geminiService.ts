@@ -53,14 +53,21 @@ const itinerarySchema = {
 };
 
 export const generateItinerary = async (prefs: UserPreferences): Promise<ItineraryResult> => {
-  // Initialize AI client only when called to prevent load-time errors
-  // Safe access to process.env for browser environments
-  const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : '';
+  let apiKey = '';
   
+  // Try to access the API Key directly.
+  // This try-catch block allows build tools that perform direct string replacement on 'process.env.API_KEY'
+  // to work, while catching ReferenceErrors in browsers where 'process' is not defined.
+  try {
+    apiKey = process.env.API_KEY || '';
+  } catch (e) {
+    // process is not defined, keeping apiKey empty
+    console.warn("process.env access failed, checking for alternatives or missing config");
+  }
+
   if (!apiKey) {
-      console.error("API_KEY not found in process.env. Check your build configuration.");
-      // Throwing a specific error allows the UI to show a configuration warning instead of a network error
-      throw new Error("API Key not configured. Please check your environment variables.");
+      console.error("API_KEY not found.");
+      throw new Error("API Key not configured. Please ensure 'API_KEY' is set in your environment variables (e.g., in Render Dashboard or .env file).");
   }
 
   const ai = new GoogleGenAI({ apiKey: apiKey });
