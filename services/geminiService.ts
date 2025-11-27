@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { UserPreferences, ItineraryResult } from "../types";
 
-// Schema definition remains static
+// Schema definition
 const itinerarySchema = {
   type: Type.OBJECT,
   properties: {
@@ -39,7 +39,7 @@ const itinerarySchema = {
                   required: ["lat", "lng"]
                 },
                 travelTime: { type: Type.STRING, description: "If type is TRAVEL, estimated duration (e.g., '1h 30m')." },
-                transportDetails: { type: Type.STRING, description: "If type is TRAVEL, provide bus companies, schedules (e.g., 'Autobuses Jiménez 10:00, 14:00'), or route specific info." }
+                transportDetails: { type: Type.STRING, description: "If type is TRAVEL, provide bus companies, schedules or route specific info." }
               },
               required: ["time", "placeName", "description", "priceEstimate", "type", "coordinates"],
             },
@@ -55,54 +55,76 @@ const itinerarySchema = {
 export const generateItinerary = async (prefs: UserPreferences): Promise<ItineraryResult> => {
   let apiKey = '';
   
-  // Try to access the API Key directly.
-  // This try-catch block allows build tools that perform direct string replacement on 'process.env.API_KEY'
-  // to work, while catching ReferenceErrors in browsers where 'process' is not defined.
-  try {
-    apiKey = process.env.API_KEY || '';
-  } catch (e) {
-    // process is not defined, keeping apiKey empty
-    console.warn("process.env access failed, checking for alternatives or missing config");
+  // Robustly attempt to find the API Key in various environments (Vite, Webpack, Node)
+  const candidates = [
+    'API_KEY', 
+    'VITE_API_KEY', 
+    'REACT_APP_API_KEY', 
+    'VITE_GEMINI_API_KEY'
+  ];
+
+  const getEnvVar = (key: string): string | undefined => {
+    // Try import.meta.env (Vite standard)
+    try {
+      // @ts-ignore
+      if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
+        // @ts-ignore
+        return import.meta.env[key];
+      }
+    } catch(e) {}
+
+    // Try process.env (Webpack / Node standard)
+    try {
+      // @ts-ignore
+      if (typeof process !== 'undefined' && process.env && process.env[key]) {
+        // @ts-ignore
+        return process.env[key];
+      }
+    } catch(e) {}
+    
+    return undefined;
+  };
+
+  for (const key of candidates) {
+    const val = getEnvVar(key);
+    if (val) {
+      apiKey = val;
+      break;
+    }
   }
 
   if (!apiKey) {
-      console.error("API_KEY not found.");
-      throw new Error("API Key not configured. Please ensure 'API_KEY' is set in your environment variables (e.g., in Render Dashboard or .env file).");
+      console.error("Available env vars check failed. Please ensure API_KEY (or VITE_API_KEY) is set in your build/deployment environment.");
+      throw new Error("Configuration Error: API Key not configured. Please ensure 'API_KEY' (or 'VITE_API_KEY') is set in your environment variables.");
   }
 
+  // Initialize client inside function to avoid top-level side effects
   const ai = new GoogleGenAI({ apiKey: apiKey });
   const model = "gemini-2.5-flash";
   
-  // Language-specific instruction
   const langInstruction = prefs.language === 'en' 
-    ? "IMPORTANT: The output MUST be in ENGLISH. Translate place descriptions, titles, and transport details to English. Keep proper names (like 'Plaza del Torico') in Spanish." 
+    ? "IMPORTANT: The output MUST be in ENGLISH." 
     : "IMPORTANTE: El output DEBE ser en ESPAÑOL.";
 
   const prompt = `
     Actúa como un experto guía turístico de la provincia de Teruel, España.
-    Crea un itinerario detallado basado en las siguientes preferencias:
-    
+    Crea un itinerario detallado:
     - Ámbito: ${prefs.scope}
-    - Ubicación Específica: ${prefs.location}
+    - Ubicación: ${prefs.location}
     - Temática: ${prefs.theme}
     - Duración: ${prefs.days} días
     - Presupuesto: ${prefs.budget}
-    - IDIOMA DE RESPUESTA: ${prefs.language === 'en' ? 'INGLÉS (ENGLISH)' : 'ESPAÑOL'}
+    - IDIOMA: ${prefs.language === 'en' ? 'INGLÉS' : 'ESPAÑOL'}
 
     ${langInstruction}
 
-    Requisitos específicos:
-    1. Si es 'Guerra Civil', incluye lugares como la Batalla de Teruel, vestigios, trincheras (ej. Museo de la Batalla).
-    2. Si es 'Geológico', incluye Dinópolis o Galve, Órganos de Montoro, etc.
-    3. Si es 'Gastronómico', recomienda Jamón de Teruel, Trufa negra, y restaurantes específicos.
-    4. Incluye horarios aproximados y precios estimados de entradas.
-    5. Sugiere lugares reales para comer y dormir (hoteles/restaurantes con nombre).
-    6. Asegúrate de que el orden geográfico tenga sentido lógico.
-    7. **IMPORTANTE**: Proporciona coordenadas GPS aproximadas (latitud/longitud) para cada actividad para poder situarlas en un mapa.
-    8. **MUY IMPORTANTE**: Si hay transporte (TRAVEL) o visitas, incluye la DIRECCIÓN (calle/número) en el campo 'address', especialmente la ubicación exacta de las paradas de autobús si aplica.
-    9. **TRANSPORTE**: Para actividades 'TRAVEL', rellena 'travelTime' y 'transportDetails' con información útil de horarios de autobuses (ej. "Salida Estación Teruel", "Autocares Samurai" o "Autobuses Jiménez") o tiempos de conducción.
+    Requisitos:
+    1. Incluye lugares reales, horarios y precios estimados.
+    2. Coordenadas GPS aproximadas para cada actividad.
+    3. Para 'TRAVEL', incluye 'travelTime' y 'transportDetails'.
+    4. Para actividades, incluye 'address' (calle/número).
     
-    Responde estrictamente en JSON usando el esquema proporcionado.
+    Responde estrictamente en JSON.
   `;
 
   try {
@@ -118,7 +140,7 @@ export const generateItinerary = async (prefs: UserPreferences): Promise<Itinera
 
     if (response.text) {
       const result = JSON.parse(response.text) as ItineraryResult;
-      result.language = prefs.language; // Tag the result
+      result.language = prefs.language;
       return result;
     }
     throw new Error("No text response generated");

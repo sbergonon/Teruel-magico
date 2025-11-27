@@ -8,22 +8,22 @@ type MapStyle = 'standard' | 'satellite' | 'terrain' | 'light';
 const MAP_STYLES: Record<MapStyle, { url: string, attribution: string, nameKey: string }> = {
   standard: {
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    attribution: '&copy; OpenStreetMap contributors',
     nameKey: 'view.layer_standard'
   },
   satellite: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+    attribution: 'Tiles &copy; Esri',
     nameKey: 'view.layer_satellite'
   },
   terrain: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community',
+    attribution: 'Tiles &copy; Esri',
     nameKey: 'view.layer_terrain'
   },
   light: {
     url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    attribution: '&copy; CARTO',
     nameKey: 'view.layer_light'
   }
 };
@@ -36,7 +36,7 @@ interface ItineraryViewProps {
 
 // Helper functions
 const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371; // Radius of the earth in km
+  const R = 6371; 
   const dLat = deg2rad(lat2 - lat1);
   const dLon = deg2rad(lon2 - lon1);
   const a =
@@ -44,24 +44,17 @@ const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon
     Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const d = R * c; // Distance in km
-  return d;
+  return R * c;
 };
 
 const deg2rad = (deg: number) => deg * (Math.PI / 180);
 
 const estimateTravelTime = (distanceKm: number) => {
-  // Rough estimate: 60km/h average speed
   const hours = distanceKm / 60;
   if (hours < 1) return `${Math.round(hours * 60)} min`;
   const h = Math.floor(hours);
   const m = Math.round((hours - h) * 60);
   return `${h}h ${m}m`;
-};
-
-const suggestTransportDetails = (distanceKm: number) => {
-    if (distanceKm < 2) return "Caminar / Walk";
-    return "Coche / Car / Bus";
 };
 
 const getActivityKey = (act: Activity) => `${act.placeName}-${act.time}`;
@@ -98,21 +91,10 @@ const TourOverlay: React.FC<TourOverlayProps> = ({ dayTitle, activities, onClose
 
   const speak = (text: string) => {
     stopSpeaking();
-    
     const u = new SpeechSynthesisUtterance(text);
     u.lang = language === 'es' ? 'es-ES' : 'en-US';
     u.rate = rate;
-    
-    u.onend = () => {
-      setIsSpeaking(false);
-      setIsPaused(false);
-    };
-    
-    u.onerror = (e) => {
-      console.error("Speech error", e);
-      setIsSpeaking(false);
-    };
-
+    u.onend = () => { setIsSpeaking(false); setIsPaused(false); };
     utteranceRef.current = u;
     synthesis.speak(u);
     setIsSpeaking(true);
@@ -127,152 +109,79 @@ const TourOverlay: React.FC<TourOverlayProps> = ({ dayTitle, activities, onClose
       synthesis.resume();
       setIsPaused(false);
     } else {
-      const textToRead = `${currentActivity.placeName}. ${currentActivity.description}`;
-      speak(textToRead);
+      speak(`${currentActivity.placeName}. ${currentActivity.description}`);
     }
   };
 
   const handleNext = () => {
     stopSpeaking();
-    if (currentStep < activities.length - 1) {
-      setCurrentStep(prev => prev + 1);
-    }
+    if (currentStep < activities.length - 1) setCurrentStep(p => p + 1);
   };
 
   const handlePrev = () => {
     stopSpeaking();
-    if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1);
-    }
+    if (currentStep > 0) setCurrentStep(p => p - 1);
   };
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => stopSpeaking();
-  }, []);
+  useEffect(() => () => stopSpeaking(), []);
 
   return (
     <div className="fixed inset-0 z-[2000] bg-teruel-dark/95 text-white flex flex-col items-center justify-center p-6 animate-fade-in">
-      <button 
-        onClick={onClose} 
-        className="absolute top-6 right-6 text-gray-400 hover:text-white"
-        title={t('tour.close')}
-      >
+      <button onClick={onClose} className="absolute top-6 right-6 text-gray-400 hover:text-white">
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
       </button>
-
-      <div className="max-w-2xl w-full text-center space-y-8">
+      <div className="max-w-2xl w-full text-center space-y-6">
         <div>
-          <h3 className="text-teruel-ochre text-sm font-bold uppercase tracking-widest mb-2">
-            {dayTitle} &bull; {t('tour.step')} {currentStep + 1} {t('tour.of')} {activities.length}
-          </h3>
-          <h2 className="text-3xl md:text-5xl font-serif font-bold mb-6 leading-tight">
-            {currentActivity.placeName}
-          </h2>
-          <div className="inline-block bg-teruel-red px-3 py-1 rounded text-sm font-bold mb-8">
-            {currentActivity.time}
-          </div>
+          <h3 className="text-teruel-ochre text-sm font-bold uppercase tracking-widest mb-2">{dayTitle} &bull; {currentStep + 1} / {activities.length}</h3>
+          <h2 className="text-3xl md:text-5xl font-serif font-bold mb-4">{currentActivity.placeName}</h2>
+          <div className="inline-block bg-teruel-red px-3 py-1 rounded text-sm font-bold">{currentActivity.time}</div>
         </div>
-
-        <p className="text-xl md:text-2xl font-light leading-relaxed text-gray-200">
-          {currentActivity.description}
-        </p>
-
-        {/* Audio Controls */}
+        <p className="text-xl font-light text-gray-200">{currentActivity.description}</p>
+        
         <div className="flex flex-col items-center gap-4 bg-white/10 p-6 rounded-xl">
            <div className="flex items-center gap-6">
-              <button 
-                onClick={handlePlayPause}
-                className="w-16 h-16 rounded-full bg-teruel-ochre text-teruel-dark flex items-center justify-center hover:scale-105 transition-transform shadow-lg"
-              >
+              <button onClick={handlePlayPause} className="w-16 h-16 rounded-full bg-teruel-ochre text-teruel-dark flex items-center justify-center hover:scale-105 transition-transform shadow-lg">
                 {isSpeaking && !isPaused ? (
                   <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>
                 ) : (
                   <svg className="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                 )}
               </button>
-              <button
-                onClick={stopSpeaking}
-                className="w-12 h-12 rounded-full border-2 border-gray-400 text-gray-300 flex items-center justify-center hover:bg-white/10"
-              >
+              <button onClick={stopSpeaking} className="w-12 h-12 rounded-full border-2 border-gray-400 text-gray-300 flex items-center justify-center">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
               </button>
            </div>
-           
            <div className="flex items-center gap-2 w-full max-w-xs">
-              <span className="text-xs text-gray-400">{t('tour.speed')}</span>
-              <input 
-                type="range" 
-                min="0.5" 
-                max="2" 
-                step="0.1" 
-                value={rate} 
-                onChange={(e) => setRate(parseFloat(e.target.value))}
-                className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
-              />
-              <span className="text-xs font-mono w-8">{rate}x</span>
+              <span className="text-xs text-gray-400">{rate}x</span>
+              <input type="range" min="0.5" max="2" step="0.1" value={rate} onChange={(e) => setRate(parseFloat(e.target.value))} className="w-full h-1 bg-gray-600 rounded-lg cursor-pointer" />
            </div>
         </div>
 
-        <div className="flex justify-between items-center w-full pt-8 border-t border-gray-700">
-          <button 
-            onClick={handlePrev} 
-            disabled={currentStep === 0}
-            className={`flex items-center gap-2 text-lg font-bold ${currentStep === 0 ? 'text-gray-600 cursor-not-allowed' : 'text-white hover:text-teruel-ochre'}`}
-          >
-            &larr; {t('tour.prev')}
-          </button>
-          
-          <button 
-            onClick={handleNext}
-            disabled={currentStep === activities.length - 1}
-            className={`flex items-center gap-2 text-lg font-bold ${currentStep === activities.length - 1 ? 'text-gray-600 cursor-not-allowed' : 'text-white hover:text-teruel-ochre'}`}
-          >
-            {t('tour.next')} &rarr;
-          </button>
+        <div className="flex justify-between w-full pt-4 border-t border-gray-700">
+          <button onClick={handlePrev} disabled={currentStep === 0} className={`text-lg font-bold ${currentStep === 0 ? 'text-gray-600' : 'text-white'}`}>&larr; {t('tour.prev')}</button>
+          <button onClick={handleNext} disabled={currentStep === activities.length - 1} className={`text-lg font-bold ${currentStep === activities.length - 1 ? 'text-gray-600' : 'text-white'}`}>{t('tour.next')} &rarr;</button>
         </div>
       </div>
     </div>
   );
 };
-// -----------------------------
-
 
 export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset, onSave }) => {
   const { t, language } = useLanguage();
   const [dayNumber, setDayNumber] = useState<number>(1);
-  const [filters, setFilters] = useState<Record<string, boolean>>({
-      VISIT: true,
-      FOOD: true,
-      LODGING: true,
-      TRAVEL: true
-  });
-  // Initialize comments from itinerary if available
+  const [filters, setFilters] = useState<Record<string, boolean>>({ VISIT: true, FOOD: true, LODGING: true, TRAVEL: true });
   const [comments, setComments] = useState<Record<string, string>>(itinerary.userComments || {});
   const [expandedActivities, setExpandedActivities] = useState<Record<number, boolean>>({});
-  
-  // Search State
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Map View State
   const [isMapView, setIsMapView] = useState(false);
-
-  // Map State
   const [currentMapStyle, setCurrentMapStyle] = useState<MapStyle>('standard');
   const [showLayerControl, setShowLayerControl] = useState(false);
-  
-  // Offline State
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showOfflineBanner, setShowOfflineBanner] = useState(true);
-
-  // Tour Mode
   const [isTourActive, setIsTourActive] = useState(false);
-
-  // Bus stop fetching state
   const [fetchingBusStops, setFetchingBusStops] = useState(false);
   const [fetchedAddresses, setFetchedAddresses] = useState<Record<string, string>>({});
 
-  // Map refs - initialized as any to handle missing L types
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markersLayer = useRef<any>(null);
@@ -280,965 +189,294 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
   const routeLayer = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false);
   
-  // Safeguard: Ensure itinerary.days exists and has content
   const days = itinerary.days || [];
   const currentDay = days.find(d => d.dayNumber === dayNumber) || days[0];
   
-  // If no currentDay (empty itinerary), render error state to prevent crash
-  if (!currentDay) {
-      return (
-          <div className="flex flex-col h-screen items-center justify-center bg-teruel-stone p-8 text-center">
-              <div className="bg-white p-8 rounded-lg shadow-xl border-t-4 border-teruel-red max-w-md">
-                  <h3 className="text-xl font-serif font-bold text-teruel-dark mb-4">Error loading itinerary data</h3>
-                  <p className="text-gray-600 mb-6">The generated itinerary seems to be empty or incomplete. Please try generating again.</p>
-                  <button onClick={onReset} className="px-6 py-2 bg-teruel-ochre text-white font-bold rounded-full hover:bg-yellow-600 transition-colors">
-                      {t('view.back')}
-                  </button>
-              </div>
-          </div>
-      );
-  }
+  if (!currentDay) return <div className="p-8 text-center"><button onClick={onReset} className="bg-red-500 text-white px-4 py-2 rounded">Error loading data. Reset.</button></div>;
 
-  const activities = currentDay.activities || []; // Default to empty array
+  const activities = currentDay.activities || [];
   const hasCoordinates = activities.some(a => a.coordinates);
 
-
-  // Monitor online status
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => {
-        setIsOnline(false);
-        setShowOfflineBanner(true); // Re-show banner if connection drops
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-        window.removeEventListener('online', handleOnline);
-        window.removeEventListener('offline', handleOffline);
-    };
+    const handleStatus = () => { setIsOnline(navigator.onLine); if(!navigator.onLine) setShowOfflineBanner(true); };
+    window.addEventListener('online', handleStatus);
+    window.addEventListener('offline', handleStatus);
+    return () => { window.removeEventListener('online', handleStatus); window.removeEventListener('offline', handleStatus); };
   }, []);
 
-  // Reset expansion and search when day changes
-  useEffect(() => {
-    setExpandedActivities({});
-    setSearchQuery('');
-  }, [dayNumber]);
-
-  // Sync state if itinerary prop changes (e.g. after save)
-  useEffect(() => {
-    if (itinerary.userComments) {
-      setComments(itinerary.userComments);
-    }
-  }, [itinerary]);
-
-  // Handle map resizing when view changes
-  useEffect(() => {
-      const timeout = setTimeout(() => {
-          if (mapInstance.current) {
-              mapInstance.current.invalidateSize();
-          }
-      }, 350); // Wait for transition to finish
-      return () => clearTimeout(timeout);
-  }, [isMapView, mapReady]);
+  useEffect(() => { setExpandedActivities({}); setSearchQuery(''); }, [dayNumber]);
+  useEffect(() => { if (itinerary.userComments) setComments(itinerary.userComments); }, [itinerary]);
+  useEffect(() => { const t = setTimeout(() => mapInstance.current?.invalidateSize(), 350); return () => clearTimeout(t); }, [isMapView, mapReady]);
 
   const onMarkerClick = useCallback((index: number) => {
-      // Expand the item in list
-      setExpandedActivities(prev => ({ ...prev, [index]: true }));
-
-      // Scroll to the item if list is visible
+      setExpandedActivities(p => ({ ...p, [index]: true }));
       const el = document.getElementById(`activity-item-${index}`);
       if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          // Add highlight effect
-          el.classList.add('ring-2', 'ring-teruel-ochre', 'bg-yellow-50');
-          setTimeout(() => el.classList.remove('ring-2', 'ring-teruel-ochre', 'bg-yellow-50'), 2000);
+          el.classList.add('ring-2', 'ring-teruel-ochre');
+          setTimeout(() => el.classList.remove('ring-2', 'ring-teruel-ochre'), 2000);
       }
   }, []);
-
-  const toggleExpansion = (index: number) => {
-      setExpandedActivities(prev => ({ ...prev, [index]: !prev[index] }));
-  };
-
-  const collapseAll = () => {
-      setExpandedActivities({});
-  };
 
   const saveComment = useCallback((act: Activity, comment: string) => {
       const key = `day_${dayNumber}_${getActivityKey(act)}`;
       const newComments = { ...comments, [key]: comment };
       setComments(newComments);
-      
-      // Auto-save the comment to storage by updating the itinerary
       onSave({ ...itinerary, userComments: newComments });
   }, [dayNumber, comments, itinerary, onSave]);
 
   const handleFetchBusStops = async () => {
     setFetchingBusStops(true);
     const newAddresses = { ...fetchedAddresses };
-    
-    // Find travel activities with coordinates but no address
     const targets = activities.filter(a => a.type === 'TRAVEL' && a.coordinates && !a.address);
-    
     for (const act of targets) {
         if (!act.coordinates) continue;
         try {
-            // Overpass API query for nearby bus stops (500m radius)
-            const query = `
-                [out:json];
-                node["highway"="bus_stop"](around:500,${act.coordinates.lat},${act.coordinates.lng});
-                out body;
-            `;
+            const query = `[out:json];node["highway"="bus_stop"](around:500,${act.coordinates.lat},${act.coordinates.lng});out body;`;
             const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
             const data = await response.json();
-            
-            if (data.elements && data.elements.length > 0) {
-                // Get closest or first
-                const stop = data.elements[0];
-                const name = stop.tags.name || 'Bus Stop';
-                newAddresses[getActivityKey(act)] = `${name} (Detected)`;
+            if (data.elements?.[0]) {
+                newAddresses[getActivityKey(act)] = `${data.elements[0].tags.name || 'Bus Stop'} (Detected)`;
             }
-        } catch (e) {
-            console.error("Bus stop fetch error", e);
-        }
+        } catch (e) { console.error(e); }
     }
-    
     setFetchedAddresses(newAddresses);
     setFetchingBusStops(false);
   };
 
   const optimizeRoute = () => {
     if (activities.length < 3) return;
-    
-    // Simple nearest neighbor sort starting from first activity
     const sorted = [...activities];
     const first = sorted.shift();
     if (!first) return;
-
     const result = [first];
     let current = first;
-    
     while(sorted.length > 0) {
-        let nearestIdx = -1;
-        let minDist = Infinity;
-        
+        let nearestIdx = -1, minDist = Infinity;
         sorted.forEach((act, idx) => {
             if (current.coordinates && act.coordinates) {
                 const dist = getDistanceFromLatLonInKm(current.coordinates.lat, current.coordinates.lng, act.coordinates.lat, act.coordinates.lng);
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearestIdx = idx;
-                }
+                if (dist < minDist) { minDist = dist; nearestIdx = idx; }
             }
         });
-        
         if (nearestIdx !== -1) {
             current = sorted[nearestIdx];
             result.push(current);
             sorted.splice(nearestIdx, 1);
-        } else {
-             // No coords or leftover
-             result.push(...sorted);
-             break;
-        }
+        } else { result.push(...sorted); break; }
     }
-    
-    // Update the itinerary in memory (this needs to prop up to be permanent, but for view we simulate)
-    const newDay = { ...currentDay, activities: result };
-    const newDays = itinerary.days.map(d => d.dayNumber === dayNumber ? newDay : d);
+    const newDays = itinerary.days.map(d => d.dayNumber === dayNumber ? { ...currentDay, activities: result } : d);
     onSave({ ...itinerary, days: newDays });
   };
 
   const handleEmailShare = () => {
-      const subject = `${t('view.share_subject') || 'Mi Viaje a Teruel'}: ${itinerary.title}`;
+      const subject = `${t('view.share_subject')}: ${itinerary.title}`;
       let body = `${itinerary.title}\n${itinerary.description}\n\n`;
-
       itinerary.days.forEach(d => {
-          body += `--- ${t('view.day').toUpperCase()} ${d.dayNumber}: ${d.title} ---\n\n`;
-          (d.activities || []).forEach(a => {
-              body += `• ${a.time} - ${a.placeName}\n`;
-              body += `  ${a.description}\n`;
-              if (a.address) body += `  📍 ${a.address}\n`;
-              if (a.priceEstimate) body += `  💰 ${a.priceEstimate}\n`;
-              
-              const key = `day_${d.dayNumber}_${getActivityKey(a)}`;
-              if (comments[key]) {
-                  body += `  📝 ${t('view.note')}: ${comments[key]}\n`;
-              }
-              body += `\n`;
+          body += `--- ${d.title} ---\n`;
+          d.activities.forEach(a => {
+             body += `• ${a.time} ${a.placeName}\n  ${a.description}\n`;
+             if(comments[`day_${d.dayNumber}_${getActivityKey(a)}`]) body += `  NOTE: ${comments[`day_${d.dayNumber}_${getActivityKey(a)}`]}\n`;
+             body += '\n';
           });
-          body += `\n`;
       });
-      
-      body += `Generated by Teruel Mágica`;
-      
       window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
   const handlePdfExport = () => {
     const element = document.getElementById('itinerary-content');
-    const opt = {
-      margin: 10,
-      filename: `Teruel_Itinerary_${itinerary.title.replace(/\s+/g, '_')}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
-    
-    // Check if html2pdf exists globally
     if ((window as any).html2pdf) {
-        (window as any).html2pdf().set(opt).from(element).save();
+        (window as any).html2pdf().set({ margin: 10, filename: 'Teruel_Trip.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4' }, pagebreak: { mode: ['avoid-all', 'css'] } }).from(element).save();
     } else {
-        alert("PDF generator not ready. Please wait or reload.");
+        alert("PDF library not loaded.");
     }
   };
 
-  // Initialize Map Structure (Containers)
-  useEffect(() => {
-    const L = (window as any).L; // Access globally here to be safe
-    if (mapContainer.current && !mapInstance.current) {
-        if (!L) return; // Wait for Leaflet to load
-        
-        // Fix Icon
-        if (L.Icon && L.Icon.Default) {
-             delete L.Icon.Default.prototype._getIconUrl;
-             L.Icon.Default.mergeOptions({
-                iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
-                iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
-            });
-        }
+  const shareText = encodeURIComponent(`${itinerary.title}\n${itinerary.description}`);
+  const currentUrl = encodeURIComponent(window.location.href);
 
+  // Map Init
+  useEffect(() => {
+    const L = (window as any).L;
+    if (mapContainer.current && !mapInstance.current && L) {
         mapInstance.current = L.map(mapContainer.current).setView([40.345, -1.106], 13);
-        
         markersLayer.current = L.layerGroup().addTo(mapInstance.current);
         setMapReady(true);
     }
-    
-    return () => {
-        if (mapInstance.current) {
-            mapInstance.current.remove();
-            mapInstance.current = null;
-        }
-    }
+    return () => { mapInstance.current?.remove(); mapInstance.current = null; };
   }, []);
 
-  // Handle Map Tile Layer Changes
+  // Layers
   useEffect(() => {
     const L = (window as any).L;
     if (!mapInstance.current || !mapReady || !L) return;
-
-    const styleConfig = MAP_STYLES[currentMapStyle];
-    
-    // Create new layer
-    const newLayer = L.tileLayer(styleConfig.url, {
-        attribution: styleConfig.attribution,
-        crossOrigin: true // Important for PDF export
-    });
-
-    // Remove old layer if exists
-    if (tileLayerRef.current) {
-        mapInstance.current.removeLayer(tileLayerRef.current);
-    }
-
-    // Add new layer
-    newLayer.addTo(mapInstance.current);
-    tileLayerRef.current = newLayer;
-
+    if (tileLayerRef.current) mapInstance.current.removeLayer(tileLayerRef.current);
+    tileLayerRef.current = L.tileLayer(MAP_STYLES[currentMapStyle].url, { attribution: MAP_STYLES[currentMapStyle].attribution, crossOrigin: true }).addTo(mapInstance.current);
   }, [currentMapStyle, mapReady]);
 
-  // Marker/Route rendering
+  // Markers
   useEffect(() => {
     const L = (window as any).L;
     if (!mapInstance.current || !mapReady || !L) return;
     const map = mapInstance.current;
-    
-    // Safety check for map container visibility updates
-    setTimeout(() => {
-        if (map) map.invalidateSize();
-    }, 100);
+    setTimeout(() => map.invalidateSize(), 100);
+    markersLayer.current.clearLayers();
+    if (routeLayer.current) map.removeLayer(routeLayer.current);
 
-    if (markersLayer.current) markersLayer.current.clearLayers();
-    
-    if (routeLayer.current) {
-        try {
-           map.removeLayer(routeLayer.current);
-        } catch (e) { /* ignore */ }
-        routeLayer.current = null;
-    }
+    const points: any[] = [];
+    let lastCoords: any = null;
 
-    // Arrays to collect points for cleaner bounds creation
-    const visiblePoints: any[] = [];
-    const allPoints: any[] = [];
-    let hasVisibleMarkers = false;
-    let lastCoords: { lat: number; lng: number } | null = null;
-
-    // Helper for popup icons
-    const getPopupIcon = (type: string) => {
-      const cls = "w-4 h-4";
-      switch (type) {
-        case 'FOOD': return `<svg class="${cls}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>`;
-        case 'VISIT': return `<svg class="${cls}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-8a2 2 0 012-2h14a2 2 0 012 2v8M15 3h6v4h-6M5 3h6v4H5" /></svg>`;
-        case 'LODGING': return `<svg class="${cls}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>`;
-        case 'TRAVEL': return `<svg class="${cls}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>`;
-        default: return '';
-      }
-    };
-
-    // Iterate through all activities to create markers and build route
     activities.forEach((act, index) => {
-        // Strict coordinate validation
-        if (!act.coordinates || typeof act.coordinates.lat !== 'number' || typeof act.coordinates.lng !== 'number') return;
-
+        if (!act.coordinates) return;
         const { lat, lng } = act.coordinates;
-        allPoints.push([lat, lng]);
-
-        // Calculate estimated travel time and transport details if missing for TRAVEL type
-        let displayTravelTime = act.travelTime;
-        let displayTransportDetails = act.transportDetails;
-        
-        // Use fetched address if original is missing using stable key
-        const actKey = getActivityKey(act);
-        const displayAddress = act.address || fetchedAddresses[actKey];
-        
-        // If it's a TRAVEL activity and we have a previous coordinate, calculate distance/time
-        if (act.type === 'TRAVEL' && lastCoords) {
-            const dist = getDistanceFromLatLonInKm(lastCoords.lat, lastCoords.lng, lat, lng);
-            // Only show if distance is significant (> 0.5km) to avoid noise
-            if (dist > 0.5) {
-                if (!displayTravelTime) {
-                    displayTravelTime = estimateTravelTime(dist);
-                }
-                if (!displayTransportDetails) {
-                    displayTransportDetails = suggestTransportDetails(dist);
-                }
-            }
-        }
+        points.push([lat, lng]);
 
         const queryLower = searchQuery.toLowerCase();
-        const matchesSearch = !searchQuery || 
-                              act.placeName.toLowerCase().includes(queryLower) || 
-                              act.description.toLowerCase().includes(queryLower);
-
-        if (filters[act.type] && matchesSearch) {
-            visiblePoints.push([lat, lng]);
-            hasVisibleMarkers = true;
-
-            const color = act.type === 'VISIT' ? '#2563EB' :
-                          act.type === 'FOOD' ? '#F97316' :
-                          act.type === 'LODGING' ? '#9333EA' :
-                          '#4B5563';
-
-            // Create DOM elements for Popup instead of string to attach events
+        if (filters[act.type] && (!searchQuery || act.placeName.toLowerCase().includes(queryLower))) {
+            const color = act.type === 'VISIT' ? '#2563EB' : act.type === 'FOOD' ? '#F97316' : act.type === 'LODGING' ? '#9333EA' : '#4B5563';
+            
             const container = document.createElement('div');
-            container.style.minWidth = '240px';
-            container.style.maxWidth = '300px';
-            container.style.fontFamily = "'Lato', sans-serif";
-
-            const toggleId = `popup-toggle-${dayNumber}-${index}`;
-            const detailsId = `popup-details-${dayNumber}-${index}`;
-            const commentSectionId = `popup-comment-${dayNumber}-${index}`;
-
-            // Enriched Popup Content mirroring ActivityItem details
-            const popupHtml = `
-              <div class="font-sans text-teruel-dark">
-                <!-- Header -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 8px;">
-                  <div style="flex: 1; margin-right: 8px;">
-                    <h3 style="font-weight: 700; font-size: 1.1rem; color: #2C241E; margin: 0; line-height: 1.2;">${act.placeName}</h3>
-                    <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap;">
-                      <span style="font-size: 0.7rem; font-weight: 700; color: #A63C3C; background: #fff; padding: 2px 8px; border-radius: 9999px; border: 1px solid #D9A441; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">${act.time}</span>
-                      <span style="font-size: 0.7rem; font-weight: 600; color: #6B7280; background: #F3F4F6; padding: 2px 6px; border-radius: 4px;">${act.priceEstimate}</span>
-                    </div>
-                  </div>
-                  <div style="background: ${color}; color: white; padding: 6px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    ${getPopupIcon(act.type)}
-                  </div>
-                </div>
-                
-                <div style="font-size: 0.85rem; color: #374151; line-height: 1.5; margin-bottom: 10px; max-height: 150px; overflow-y: auto;">
-                  ${act.description}
-                </div>
-
-                <!-- Toggle Button -->
-                <button id="${toggleId}" style="width: 100%; font-size: 0.75rem; font-weight: bold; color: #D9A441; background: #FFF9E6; border: 1px dashed #D9A441; padding: 6px; margin-bottom: 8px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center; gap: 4px; transition: background 0.2s;">
-                   <span>${language === 'es' ? 'Ver opciones y detalles' : 'View options & details'}</span>
-                   <svg style="width: 12px; height: 12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-
-                <!-- Hidden Content -->
-                <div id="${detailsId}" style="display: none;">
-                    ${displayAddress ? `
-                      <div style="display: flex; align-items: flex-start; gap: 6px; font-size: 0.75rem; color: #6B7280; background: #F9FAFB; padding: 6px; border-radius: 4px; margin-bottom: 6px; border: 1px solid #E5E7EB;">
-                        <span style="margin-top: 1px;">📍</span>
-                        <span>${displayAddress}</span>
-                      </div>
-                    ` : ''}
-
-                    ${act.type === 'TRAVEL' ? `
-                      <div style="background: #F3F4F6; padding: 6px; border-radius: 4px; border-left: 3px solid #9CA3AF; margin-bottom: 6px; font-size: 0.75rem;">
-                         ${displayTravelTime ? `<div style="font-weight: 700; color: #4A6C44; margin-bottom: 2px;">⏱ ${displayTravelTime}</div>` : ''}
-                         ${displayTransportDetails ? `<div style="color: #4B5563; font-style: italic;">🚌 ${displayTransportDetails}</div>` : ''}
-                      </div>
-                    ` : ''}
-
-                    ${(act.type === 'LODGING' || act.type === 'FOOD') ? `
-                        <div style="text-align: center; margin-bottom: 8px;">
-                          <a href="${getReservationLink(act.placeName, act.type)}" target="_blank" rel="noopener noreferrer" 
-                             style="display: inline-block; background: #D9A441; color: white; font-size: 0.75rem; font-weight: 700; padding: 6px 16px; border-radius: 9999px; text-decoration: none; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
-                             ${act.type === 'LODGING' ? (t('view.reserve_stay') || 'Reservar') : (t('view.reserve_food') || 'Mesa')}
-                             <span style="margin-left: 2px;">↗</span>
-                          </a>
-                        </div>
-                    ` : ''}
-                </div>
-
-                <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 4px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
-                   <button id="btn-view-list-${index}" style="font-size: 0.75rem; font-weight: 700; color: #D9A441; background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; gap: 2px;">
-                      ${t('view.show_details') || 'Ver detalles'} <span style="font-size: 1rem; line-height: 0;">&rarr;</span>
-                   </button>
-                </div>
-                
-                <!-- Comment Section Placeholder -->
-                <div id="${commentSectionId}" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #E5E7EB;"></div>
+            container.style.width = '260px';
+            
+            // Minimal Popup HTML logic
+            container.innerHTML = `
+              <div class="text-teruel-dark font-sans text-sm">
+                <h3 class="font-bold text-base mb-1">${act.placeName}</h3>
+                <div class="text-xs text-gray-500 mb-2">${act.time} • ${act.priceEstimate}</div>
+                <p class="mb-2 text-gray-700">${act.description.substring(0, 100)}...</p>
+                <div id="comment-area-${index}" class="mt-2 border-t pt-2"></div>
               </div>
             `;
-            
-            container.innerHTML = popupHtml;
 
-            // Wire up toggle button in popup
-            const btnToggle = container.querySelector(`#${toggleId}`);
-            const divDetails = container.querySelector(`#${detailsId}`) as HTMLElement | null;
-            if (btnToggle && divDetails) {
-                btnToggle.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const isHidden = divDetails.style.display === 'none';
-                    divDetails.style.display = isHidden ? 'block' : 'none';
-                    
-                    const btnText = isHidden 
-                      ? (language === 'es' ? 'Ocultar' : 'Hide')
-                      : (language === 'es' ? 'Ver opciones y detalles' : 'View options & details');
-                    const arrowRotation = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
-                    
-                    btnToggle.innerHTML = `<span>${btnText}</span><svg style="width: 12px; height: 12px; transform: ${arrowRotation}; transition: transform 0.2s;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>`;
-                });
-            }
-
-            // Wire up the button to scroll to list
-            const btn = container.querySelector(`#btn-view-list-${index}`);
-            if(btn) {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (isMapView) {
-                        setIsMapView(false); // Switch back to list view on mobile
-                        setTimeout(() => onMarkerClick(index), 300); // Delay scroll to allow transition
-                    } else {
-                        onMarkerClick(index);
-                    }
-                });
-            }
-
-            // --- COMMENT SECTION LOGIC ---
-            const renderCommentUI = () => {
-                const section = container.querySelector(`#${commentSectionId}`);
-                if (!section) return;
-
+            // Comment Logic
+            const renderComments = () => {
+                const area = container.querySelector(`#comment-area-${index}`);
+                if (!area) return;
                 const key = `day_${dayNumber}_${getActivityKey(act)}`;
-                const currentComment = comments[key] || '';
+                const comment = comments[key] || '';
                 
-                section.innerHTML = ''; // Clear
-
-                if (currentComment) {
-                    // Display Mode
-                    const displayDiv = document.createElement('div');
-                    displayDiv.style.background = '#FEF3C7'; // yellow-50
-                    displayDiv.style.borderLeft = '3px solid #D97706'; // amber-600
-                    displayDiv.style.padding = '8px';
-                    displayDiv.style.borderRadius = '4px';
-                    displayDiv.style.fontSize = '0.75rem';
-                    displayDiv.style.color = '#78350F'; // amber-900
-                    displayDiv.style.marginBottom = '6px';
-                    displayDiv.innerText = currentComment;
-                    
-                    const editLink = document.createElement('button');
-                    editLink.innerText = language === 'es' ? 'Editar nota' : 'Edit note';
-                    editLink.style.fontSize = '0.7rem';
-                    editLink.style.textDecoration = 'underline';
-                    editLink.style.color = '#6B7280';
-                    editLink.style.background = 'none';
-                    editLink.style.border = 'none';
-                    editLink.style.cursor = 'pointer';
-                    editLink.style.padding = '0';
-                    editLink.onclick = (e) => {
+                area.innerHTML = `
+                    <textarea class="w-full text-xs p-1 border rounded mb-1" placeholder="Add note...">${comment}</textarea>
+                    <button class="bg-teruel-ochre text-white text-xs px-2 py-1 rounded w-full font-bold">Save Note</button>
+                `;
+                const btn = area.querySelector('button');
+                const txt = area.querySelector('textarea');
+                if (btn && txt) {
+                    btn.onclick = (e) => {
                         e.stopPropagation();
-                        renderEditMode();
+                        saveComment(act, txt.value);
+                        btn.innerText = "Saved!";
+                        setTimeout(() => btn.innerText = "Save Note", 1000);
                     };
-
-                    section.appendChild(displayDiv);
-                    section.appendChild(editLink);
-                } else {
-                    // Empty state -> Show Edit Mode immediately to allow adding
-                    renderEditMode();
-                }
-
-                function renderEditMode() {
-                    section!.innerHTML = '';
-                    
-                    const textarea = document.createElement('textarea');
-                    textarea.placeholder = language === 'es' ? "Añadir nota personal..." : "Add personal note...";
-                    textarea.style.width = '100%';
-                    textarea.style.fontSize = '0.75rem';
-                    textarea.style.padding = '8px';
-                    textarea.style.border = '1px solid #D1D5DB';
-                    textarea.style.borderRadius = '4px';
-                    textarea.style.resize = 'vertical';
-                    textarea.style.minHeight = '60px';
-                    textarea.style.fontFamily = 'inherit';
-                    textarea.style.marginBottom = '6px';
-                    textarea.value = currentComment;
-                    
-                    // Button Container
-                    const btnContainer = document.createElement('div');
-                    btnContainer.style.display = 'flex';
-                    btnContainer.style.justifyContent = 'flex-end';
-                    btnContainer.style.gap = '8px';
-
-                    // Cancel Button
-                    if (currentComment) {
-                        const cancelBtn = document.createElement('button');
-                        cancelBtn.innerText = language === 'es' ? 'Cancelar' : 'Cancel';
-                        cancelBtn.style.color = '#6B7280';
-                        cancelBtn.style.background = 'none';
-                        cancelBtn.style.border = 'none';
-                        cancelBtn.style.fontSize = '0.7rem';
-                        cancelBtn.style.cursor = 'pointer';
-                        cancelBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            renderCommentUI(); // Revert
-                        };
-                        btnContainer.appendChild(cancelBtn);
-                    }
-
-                    // Save Button
-                    const saveBtn = document.createElement('button');
-                    saveBtn.innerText = language === 'es' ? 'Guardar' : 'Save';
-                    saveBtn.style.backgroundColor = '#D9A441'; // Teruel Ochre
-                    saveBtn.style.color = 'white';
-                    saveBtn.style.border = 'none';
-                    saveBtn.style.borderRadius = '4px';
-                    saveBtn.style.padding = '4px 12px';
-                    saveBtn.style.fontSize = '0.7rem';
-                    saveBtn.style.fontWeight = 'bold';
-                    saveBtn.style.cursor = 'pointer';
-                    saveBtn.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
-                    
-                    saveBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        saveComment(act, textarea.value);
-                    };
-
-                    btnContainer.appendChild(saveBtn);
-                    
-                    section!.appendChild(textarea);
-                    section!.appendChild(btnContainer);
-                    
-                    // Optional: Focus (careful with map panning)
-                    if (!currentComment) {
-                        setTimeout(() => textarea.focus(), 100);
-                    }
                 }
             };
+            renderComments();
 
-            // Initial render of the comment UI inside popup
-            renderCommentUI();
-
-            const marker = L.circleMarker([lat, lng], {
-              radius: 8,
-              fillColor: color,
-              color: '#fff',
-              weight: 2,
-              opacity: 1,
-              fillOpacity: 0.9
-            })
-            .addTo(markersLayer.current)
-            .bindPopup(container); // Pass DOM element
-            
-            // Add click listener to marker to scroll list and expand
-            marker.on('click', () => {
-                // If in full map mode, we stay there to see popup. 
-                // But logic remains for sync
-            });
+            const marker = L.circleMarker([lat, lng], { radius: 8, fillColor: color, color: '#fff', weight: 2, fillOpacity: 0.9 }).addTo(markersLayer.current);
+            marker.bindPopup(container);
+            marker.on('click', () => { /* Optional interactions */ });
         }
-        
-        // Update lastCoords for next calculation
         lastCoords = { lat, lng };
     });
 
-    if (allPoints.length > 1) {
-      routeLayer.current = L.polyline(allPoints, { color: '#4A6C44', weight: 3, dashArray: '5, 10', opacity: 0.6 }).addTo(map);
-    }
-
-    try {
-        if (hasVisibleMarkers && visiblePoints.length > 0) {
-            const bounds = L.latLngBounds(visiblePoints);
-            if (bounds.isValid()) {
-                map.fitBounds(bounds, { padding: [50, 50] });
-            }
-        } else if (allPoints.length > 0 && !searchQuery) {
-             // If searching and nothing found, don't move. If not searching, show all.
-            const bounds = L.latLngBounds(allPoints);
-            if (bounds.isValid()) {
-               map.fitBounds(bounds, { padding: [50, 50] });
-            }
-        } else if (!hasCoordinates) {
-            map.setView([40.345, -1.106], 9);
-        }
-    } catch (e) {
-        console.warn("Bounds error corrected", e);
-        map.setView([40.345, -1.106], 9);
-    }
+    if (points.length > 1) routeLayer.current = L.polyline(points, { color: '#4A6C44', weight: 3, dashArray: '5, 10' }).addTo(map);
     
-  }, [activities, filters, isOnline, onMarkerClick, t, fetchedAddresses, comments, dayNumber, saveComment, mapReady, language, searchQuery, currentMapStyle]);
+    if (points.length > 0 && !searchQuery) {
+       try { map.fitBounds(L.latLngBounds(points), { padding: [50, 50] }); } catch(e) {}
+    } else if (!hasCoordinates) {
+       map.setView([40.345, -1.106], 9);
+    }
+  }, [activities, filters, mapReady, currentMapStyle, dayNumber, comments, saveComment, searchQuery]);
 
   return (
     <div className="flex flex-col h-full bg-teruel-stone min-h-[80vh]" id="itinerary-view-root">
-        {/* Tour Overlay */}
-        {isTourActive && (
-           <TourOverlay 
-             dayTitle={currentDay.title} 
-             activities={activities.filter(a => filters[a.type])} // Only narrate filtered
-             onClose={() => setIsTourActive(false)} 
-           />
-        )}
-
-        {/* Offline Banner */}
+        {isTourActive && <TourOverlay dayTitle={currentDay.title} activities={activities.filter(a => filters[a.type])} onClose={() => setIsTourActive(false)} />}
         {!isOnline && showOfflineBanner && (
-              <div className="bg-teruel-red text-white p-3 text-center text-sm font-bold flex justify-between items-center animate-fade-in shadow-md relative z-30">
-                  <div className="flex items-center gap-2 mx-auto">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414" /></svg>
-                      <span>{t('view.offline_banner')}</span>
-                  </div>
-                  <button 
-                      onClick={() => setShowOfflineBanner(false)}
-                      className="text-white hover:text-gray-200 p-1 bg-white/10 rounded-full hover:bg-white/20 transition-colors"
-                      title={t('view.hide_details') || "Dismiss"}
-                  >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
+              <div className="bg-teruel-red text-white p-2 text-center text-sm font-bold flex justify-between z-30">
+                  <span>{t('view.offline_banner')}</span>
+                  <button onClick={() => setShowOfflineBanner(false)}>✕</button>
               </div>
         )}
 
-        {/* Top Controls */}
-        <div className="bg-white p-4 shadow-sm border-b border-gray-200 sticky top-0 z-20">
-            <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-                <button onClick={onReset} className="text-teruel-dark hover:text-teruel-red font-bold text-sm flex items-center">
-                    &larr; {t('view.back')}
-                </button>
-                <div className="text-center">
-                    <h2 className="font-serif font-bold text-xl text-teruel-dark">{itinerary.title}</h2>
-                    <p className="text-xs text-gray-500">{t('view.generated_on')} {new Date().toLocaleDateString()}</p>
-                </div>
-                <div className="flex gap-2 flex-wrap justify-center">
-                    <button 
-                        onClick={handlePdfExport}
-                        className="bg-gray-800 text-white px-4 py-2 rounded-full text-sm font-bold shadow hover:bg-gray-700 flex items-center gap-1"
-                        title={t('view.pdf')}
-                    >
-                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                        <span className="hidden sm:inline">PDF</span>
-                    </button>
-                    <button 
-                        onClick={handleEmailShare}
-                        className="bg-teruel-green text-white px-4 py-2 rounded-full text-sm font-bold shadow hover:bg-green-700 flex items-center gap-1"
-                        title={t('view.email')}
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                        <span className="hidden sm:inline">{t('view.email')}</span>
-                    </button>
-                    <button onClick={() => onSave({ ...itinerary, userComments: comments })} className="bg-teruel-ochre text-white px-4 py-2 rounded-full text-sm font-bold shadow hover:bg-yellow-600">
-                        {t('view.save')}
-                    </button>
-                </div>
+        <div className="bg-white p-4 shadow border-b sticky top-0 z-20 flex flex-wrap gap-4 justify-between items-center">
+            <div className="flex items-center gap-2">
+                <button onClick={onReset} className="font-bold text-teruel-dark">&larr; {t('view.back')}</button>
+                <h2 className="font-serif font-bold text-lg hidden md:block">{itinerary.title}</h2>
             </div>
-        </div>
-
-        {/* Days Navigation */}
-        <div className="bg-teruel-dark text-teruel-ochre p-2 overflow-x-auto whitespace-nowrap text-center shadow-inner">
-            <div className="inline-flex space-x-2">
-                {(itinerary.days || []).map(d => (
-                    <button 
-                        key={d.dayNumber}
-                        onClick={() => setDayNumber(d.dayNumber)}
-                        className={`px-4 py-2 rounded-lg font-bold transition-all ${
-                            dayNumber === d.dayNumber ? 'bg-teruel-ochre text-teruel-dark' : 'hover:bg-gray-800'
-                        }`}
-                    >
-                        {t('view.day')} {d.dayNumber}
-                    </button>
-                ))}
-            </div>
-        </div>
-
-        {/* Content Grid (Wrapped in ID for PDF export if needed) */}
-        <div id="itinerary-content" className="flex-grow flex flex-col md:flex-row max-w-7xl mx-auto w-full relative overflow-hidden">
             
-            {/* View Toggle Button (Floating) */}
-            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-[1000] pointer-events-auto">
-                 <button
-                    onClick={() => setIsMapView(!isMapView)}
-                    className="bg-teruel-dark text-white border-2 border-teruel-ochre px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 hover:scale-105 transition-transform"
-                    data-html2canvas-ignore="true" // Ignore in PDF
-                 >
-                    {isMapView ? (
-                        <>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
-                            <span>{t('view.show_list') || 'Ver Lista'}</span>
-                        </>
-                    ) : (
-                        <>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
-                            <span>{t('view.show_map') || 'Ver Mapa'}</span>
-                        </>
-                    )}
+            <div className="flex gap-2 items-center flex-wrap justify-end">
+                {/* Socials */}
+                <button onClick={() => window.open(`https://wa.me/?text=${shareText}`, '_blank')} className="bg-[#25D366] text-white p-1.5 rounded shadow hover:opacity-80 transition" title="Share on WhatsApp"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.232-.298.347-.497.115-.198.058-.372-.029-.545-.087-.173-.781-1.882-1.07-2.576-.282-.676-.57-.584-.781-.595-.2-.012-.429-.014-.657-.014-.228 0-.598.086-.911.428-.313.342-1.198 1.171-1.198 2.856 0 1.685 1.226 3.313 1.396 3.543.17.23 2.413 3.684 5.847 5.167 2.224.961 2.677.77 3.655.678.978-.092 2.112-.864 2.409-1.698.297-.834.297-1.549.208-1.698-.089-.149-.328-.239-.625-.388zM12 21.75c-1.776 0-3.444-.46-4.912-1.268l-.352-.208-3.654.958.975-3.564-.229-.364A9.718 9.718 0 012.25 12C2.25 6.626 6.626 2.25 12 2.25S21.75 6.626 21.75 12 17.374 21.75 12 21.75z"/></svg></button>
+                <button onClick={() => window.open(`https://twitter.com/intent/tweet?text=${shareText}`, '_blank')} className="bg-black text-white p-1.5 rounded shadow hover:opacity-80 transition" title="Share on X"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></button>
+                <button onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${currentUrl}`, '_blank')} className="bg-[#1877F2] text-white p-1.5 rounded shadow hover:opacity-80 transition" title="Share on Facebook"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.791-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></button>
+                <div className="w-px h-6 bg-gray-300 mx-1"></div>
+                {/* Actions */}
+                <button onClick={handlePdfExport} className="bg-gray-800 text-white px-3 py-1 rounded text-sm font-bold">PDF</button>
+                <button onClick={handleEmailShare} className="bg-teruel-green text-white px-3 py-1 rounded text-sm font-bold">Email</button>
+                <button onClick={() => onSave({ ...itinerary, userComments: comments })} className="bg-teruel-ochre text-white px-3 py-1 rounded text-sm font-bold">{t('view.save')}</button>
+            </div>
+        </div>
+
+        <div className="bg-teruel-dark p-2 overflow-x-auto whitespace-nowrap text-center">
+            {days.map(d => (
+                <button key={d.dayNumber} onClick={() => setDayNumber(d.dayNumber)} className={`px-4 py-1 mx-1 rounded font-bold ${dayNumber === d.dayNumber ? 'bg-teruel-ochre text-teruel-dark' : 'text-gray-400'}`}>{t('view.day')} {d.dayNumber}</button>
+            ))}
+        </div>
+
+        <div id="itinerary-content" className="flex-grow flex flex-col md:flex-row max-w-7xl mx-auto w-full relative">
+            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-[1000]">
+                 <button onClick={() => setIsMapView(!isMapView)} className="bg-teruel-dark text-white border-2 border-teruel-ochre px-6 py-2 rounded-full shadow-xl font-bold md:hidden">
+                    {isMapView ? t('view.show_list') : t('view.show_map')}
                  </button>
             </div>
 
-            {/* List View */}
-            <div className={`
-                w-full transition-all duration-300 ease-in-out bg-teruel-stone
-                ${isMapView ? 'h-0 overflow-hidden md:h-auto md:w-0 md:opacity-0' : 'h-full md:h-auto md:w-1/2 md:opacity-100'}
-                p-4 overflow-y-auto
-            `}>
-                <div className="mb-4">
-                     <div className="flex justify-between items-center mb-2">
-                         <h3 className="font-serif font-bold text-2xl text-teruel-red">{currentDay.title}</h3>
-                         <div className="flex gap-2">
-                             <button 
-                                onClick={() => setIsTourActive(true)}
-                                className="text-xs text-white bg-teruel-red px-2 py-1 rounded-full font-bold hover:bg-red-800 transition-colors flex items-center gap-1"
-                             >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
-                                {t('view.start_tour')}
-                             </button>
-                             <button onClick={collapseAll} className="text-xs text-teruel-red underline font-bold hover:text-teruel-dark transition-colors">
-                                {t('view.collapse_all')}
-                             </button>
-                         </div>
-                     </div>
-                     
-                     {/* Search Bar */}
-                     <div className="relative mb-3">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                        </div>
-                        <input
-                            type="text"
-                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-teruel-ochre focus:border-teruel-ochre sm:text-sm"
-                            placeholder={language === 'es' ? "Buscar actividad..." : "Search activity..."}
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                        {searchQuery && (
-                            <button
-                                onClick={() => setSearchQuery('')}
-                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
-                            >
-                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        )}
-                     </div>
+            <div className={`w-full bg-teruel-stone p-4 overflow-y-auto ${isMapView ? 'hidden md:block md:w-0' : 'block md:w-1/2'}`}>
+                 <div className="flex justify-between items-center mb-4">
+                     <h3 className="font-serif font-bold text-2xl text-teruel-red">{currentDay.title}</h3>
+                     <button onClick={() => setIsTourActive(true)} className="bg-teruel-red text-white px-3 py-1 rounded-full text-xs font-bold">{t('view.start_tour')}</button>
+                 </div>
+                 
+                 <input type="text" className="w-full p-2 border rounded mb-3" placeholder={language === 'es' ? "Buscar..." : "Search..."} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                 
+                 <div className="flex gap-2 mb-4 text-xs">
+                     {Object.keys(filters).map(k => (
+                         <button key={k} onClick={() => setFilters(p => ({...p, [k]: !p[k as any]}))} className={`px-2 py-1 rounded border ${filters[k as any] ? 'bg-gray-700 text-white' : 'bg-gray-200'}`}>{k}</button>
+                     ))}
+                 </div>
 
-                     {/* Filters */}
-                     <div className="flex flex-wrap gap-2 text-xs">
-                         {Object.keys(filters).map((k) => (
-                             <button 
-                                key={k}
-                                onClick={() => setFilters(prev => ({...prev, [k as keyof typeof filters]: !prev[k as keyof typeof filters]}))}
-                                className={`px-2 py-1 rounded border ${
-                                    filters[k as keyof typeof filters] ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-400'
-                                }`}
-                             >
-                                 {t(`view.filter_${k.toLowerCase()}`)}
-                             </button>
-                         ))}
-                     </div>
-                </div>
-
-                <div className="space-y-4 pb-20 md:pb-0">
-                    {activities.filter(a => {
-                        const matchesType = filters[a.type];
-                        const searchLower = searchQuery.toLowerCase();
-                        const matchesSearch = !searchQuery || 
-                                              a.placeName.toLowerCase().includes(searchLower) || 
-                                              a.description.toLowerCase().includes(searchLower);
-                        return matchesType && matchesSearch;
-                    }).map((act, idx) => {
-                        const isExpanded = expandedActivities[idx];
-                        const actKey = getActivityKey(act);
-                        
-                        return (
-                            <div 
-                                key={idx} 
-                                id={`activity-item-${idx}`} 
-                                className={`bg-white rounded-lg shadow-md p-4 border-l-4 border-teruel-green hover:shadow-lg transition-all cursor-pointer ${isExpanded ? 'ring-2 ring-teruel-ochre' : ''}`}
-                                onClick={() => toggleExpansion(idx)}
-                            >
-                                <div className="flex justify-between items-start mb-2">
-                                    <h4 className="font-bold text-lg text-gray-800 leading-tight">{act.placeName}</h4>
-                                    <div className="flex flex-col items-end">
-                                        <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded font-mono mb-1">{act.time}</span>
-                                        <svg 
-                                            className={`w-4 h-4 text-teruel-ochre transform transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
-                                            fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                        >
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </div>
+                 <div className="space-y-4">
+                    {activities.filter(a => filters[a.type] && (!searchQuery || a.placeName.toLowerCase().includes(searchQuery.toLowerCase()))).map((act, idx) => (
+                        <div key={idx} id={`activity-item-${idx}`} onClick={() => setExpandedActivities(p => ({...p, [idx]: !p[idx]}))} className="bg-white rounded shadow p-4 border-l-4 border-teruel-green cursor-pointer">
+                            <div className="flex justify-between"><h4 className="font-bold">{act.placeName}</h4><span className="text-xs bg-gray-100 px-2 rounded">{act.time}</span></div>
+                            <p className="text-sm text-gray-600 mt-1">{act.description}</p>
+                            {expandedActivities[idx] && (
+                                <div className="mt-2 pt-2 border-t text-xs text-gray-500">
+                                    <p>💰 {act.priceEstimate}</p>
+                                    {act.address && <p>📍 {act.address}</p>}
+                                    {act.type === 'TRAVEL' && <p className="text-blue-600">🚌 {act.transportDetails || 'Transport'}</p>}
+                                    {(act.type === 'FOOD' || act.type === 'LODGING') && <a href={getReservationLink(act.placeName, act.type)} target="_blank" className="text-teruel-ochre font-bold block mt-1">Book Now ↗</a>}
                                 </div>
-                                
-                                <p className="text-sm text-gray-600 mb-2">{act.description}</p>
-                                
-                                {isExpanded && (
-                                    <div className="mt-4 pt-4 border-t border-gray-100 space-y-3 animate-fade-in">
-                                        <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-                                            <span className="flex items-center px-2 py-1 bg-yellow-50 rounded text-yellow-800">💰 {act.priceEstimate}</span>
-                                            {act.type === 'TRAVEL' && act.travelTime && (
-                                                <span className="flex items-center text-blue-800 bg-blue-50 px-2 py-1 rounded">🚗 {act.travelTime}</span>
-                                            )}
-                                        </div>
-                                        
-                                        {act.type === 'TRAVEL' && act.transportDetails && (
-                                            <div className="text-xs text-blue-600 italic bg-blue-50 p-2 rounded">
-                                                🚌 {act.transportDetails}
-                                            </div>
-                                        )}
-
-                                        {act.address && (
-                                            <p className="text-xs text-gray-500 flex items-start p-2 bg-gray-50 rounded">
-                                                <span className="mr-1">📍</span>
-                                                {act.address}
-                                            </p>
-                                        )}
-                                        
-                                        {(act.type === 'LODGING' || act.type === 'FOOD') && (
-                                             <div className="flex justify-start">
-                                                <a href={getReservationLink(act.placeName, act.type)} target="_blank" rel="noopener noreferrer" 
-                                                   onClick={(e) => e.stopPropagation()}
-                                                   className="inline-flex items-center text-xs font-bold text-white bg-teruel-ochre hover:bg-yellow-600 px-3 py-1.5 rounded-full transition-colors shadow-sm">
-                                                    {act.type === 'LODGING' ? (t('view.reserve_stay') || 'Reservar') : (t('view.reserve_food') || 'Mesa')}
-                                                    <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                                                </a>
-                                             </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Comment inline display */}
-                                {comments[`day_${dayNumber}_${actKey}`] && (
-                                    <div className="mt-3 p-2 bg-yellow-50 text-xs italic text-yellow-800 border-l-2 border-yellow-400">
-                                        📝 {comments[`day_${dayNumber}_${actKey}`]}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
+                            )}
+                        </div>
+                    ))}
+                 </div>
             </div>
 
-            {/* Map View */}
-            <div className={`
-                transition-all duration-300 ease-in-out bg-gray-200 relative group
-                ${isMapView ? 'h-[calc(100vh-140px)] md:h-auto w-full' : 'h-0 overflow-hidden md:h-auto md:w-1/2'}
-            `}>
-                <div ref={mapContainer} className="w-full h-full min-h-[400px]" style={{ zIndex: 1 }}></div>
-                
-                {/* Advanced Map Controls Container */}
-                <div className="absolute top-4 right-4 z-[500] flex flex-col items-end gap-2">
-                    
-                    {/* Optimize Route Button */}
-                    <button 
-                        onClick={optimizeRoute}
-                        className="bg-white p-2 rounded shadow-md hover:bg-gray-100 text-teruel-dark border border-gray-300 transition-colors flex items-center justify-center w-10 h-10 group relative"
-                        title={language === 'es' ? 'Optimizar Ruta' : 'Optimize Route'}
-                    >
-                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-                    </button>
-
-                    {/* Bus Stop Button */}
-                    <button 
-                        onClick={handleFetchBusStops}
-                        disabled={fetchingBusStops}
-                        className={`bg-white p-2 rounded shadow-md hover:bg-gray-100 text-blue-600 border border-gray-300 transition-colors flex items-center justify-center w-10 h-10 ${fetchingBusStops ? 'animate-pulse' : ''}`}
-                        title={language === 'es' ? 'Buscar paradas de bus' : 'Find bus stops'}
-                    >
-                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
-                    </button>
-
-                    {/* Wi-Fi Indicator */}
-                    <div 
-                        className={`p-2 rounded shadow-md bg-white border transition-colors ${
-                            isOnline ? 'text-green-600 border-green-200' : 'text-red-600 border-red-200'
-                        }`}
-                        title={isOnline ? (language === 'es' ? 'Conexión activa' : 'Online') : (language === 'es' ? 'Sin conexión' : 'Offline')}
-                    >
-                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-                        </svg>
-                    </div>
-
-                    {/* Layer Control Button */}
-                    <div className="relative">
-                        <button 
-                            onClick={() => setShowLayerControl(!showLayerControl)}
-                            className="bg-white p-2 rounded shadow-md hover:bg-gray-100 text-teruel-dark border border-gray-300 transition-colors flex items-center justify-center w-10 h-10"
-                            title={t('view.layers_title')}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                            </svg>
-                        </button>
-                        
+            <div className={`w-full bg-gray-200 relative ${!isMapView ? 'hidden md:block md:w-1/2' : 'block h-[80vh]'}`}>
+                <div ref={mapContainer} className="w-full h-full" style={{ zIndex: 1 }}></div>
+                <div className="absolute top-4 right-4 z-[500] flex flex-col gap-2">
+                    <button onClick={optimizeRoute} className="bg-white p-2 rounded shadow text-teruel-dark" title="Optimize Route">⚡</button>
+                    <button onClick={handleFetchBusStops} className={`bg-white p-2 rounded shadow text-blue-600 ${fetchingBusStops ? 'animate-pulse' : ''}`} title="Find Bus Stops">🚌</button>
+                    <div className="relative group">
+                        <button onClick={() => setShowLayerControl(!showLayerControl)} className="bg-white p-2 rounded shadow">🗺️</button>
                         {showLayerControl && (
-                            <div className="absolute right-0 top-12 bg-white rounded shadow-xl p-1 min-w-[160px] animate-fade-in flex flex-col gap-1 border border-gray-200 z-[600]">
-                                <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wide border-b border-gray-100 mb-1">
-                                    {language === 'es' ? 'Tipo de Mapa' : 'Map Type'}
-                                </div>
-                                {(Object.keys(MAP_STYLES) as MapStyle[]).map((style) => (
-                                    <button
-                                        key={style}
-                                        onClick={() => {
-                                            setCurrentMapStyle(style);
-                                            setShowLayerControl(false);
-                                        }}
-                                        className={`text-left px-3 py-2 text-sm rounded transition-colors flex items-center gap-2 ${
-                                            currentMapStyle === style 
-                                            ? 'bg-teruel-ochre text-white font-bold' 
-                                            : 'hover:bg-gray-100 text-gray-700'
-                                        }`}
-                                    >
-                                        <div className={`w-3 h-3 rounded-full border border-white ${currentMapStyle === style ? 'bg-white' : 'bg-gray-300'}`}></div>
-                                        {t(MAP_STYLES[style].nameKey)}
-                                    </button>
-                                ))}
+                            <div className="absolute right-0 top-10 bg-white shadow rounded p-2 min-w-[120px]">
+                                {Object.keys(MAP_STYLES).map(s => <button key={s} onClick={() => { setCurrentMapStyle(s as any); setShowLayerControl(false); }} className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100">{s}</button>)}
                             </div>
                         )}
                     </div>
                 </div>
-
-                {!hasCoordinates && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-100/80 z-10 pointer-events-none">
-                        <div className="text-center p-4">
-                            <p className="text-teruel-dark font-bold">{t('view.map_offline_title')}</p>
-                            <p className="text-sm text-gray-600">{t('view.map_offline_desc')}</p>
-                        </div>
-                    </div>
-                )}
+                {!hasCoordinates && <div className="absolute inset-0 flex items-center justify-center bg-white/80"><p>{t('view.map_offline_title')}</p></div>}
             </div>
         </div>
     </div>
