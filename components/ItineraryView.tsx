@@ -181,6 +181,7 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
   const [isTourActive, setIsTourActive] = useState(false);
   const [fetchingBusStops, setFetchingBusStops] = useState(false);
   const [fetchedAddresses, setFetchedAddresses] = useState<Record<string, string>>({});
+  const [description, setDescription] = useState(itinerary.description);
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -222,8 +223,8 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
       const key = `day_${dayNumber}_${getActivityKey(act)}`;
       const newComments = { ...comments, [key]: comment };
       setComments(newComments);
-      onSave({ ...itinerary, userComments: newComments });
-  }, [dayNumber, comments, itinerary, onSave]);
+      onSave({ ...itinerary, description, userComments: newComments });
+  }, [dayNumber, comments, itinerary, description, onSave]);
 
   const handleFetchBusStops = async () => {
     setFetchingBusStops(true);
@@ -266,12 +267,12 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
         } else { result.push(...sorted); break; }
     }
     const newDays = itinerary.days.map(d => d.dayNumber === dayNumber ? { ...currentDay, activities: result } : d);
-    onSave({ ...itinerary, days: newDays });
+    onSave({ ...itinerary, description, days: newDays });
   };
 
   const handleEmailShare = () => {
       const subject = `${t('view.share_subject')}: ${itinerary.title}`;
-      let body = `${itinerary.title}\n${itinerary.description}\n\n`;
+      let body = `${itinerary.title}\n${description}\n\n`;
       itinerary.days.forEach(d => {
           body += `--- ${d.title} ---\n`;
           d.activities.forEach(a => {
@@ -286,13 +287,13 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
   const handlePdfExport = () => {
     const element = document.getElementById('itinerary-content');
     if ((window as any).html2pdf) {
-        (window as any).html2pdf().set({ margin: 10, filename: 'Teruel_Trip.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4' }, pagebreak: { mode: ['avoid-all', 'css'] } }).from(element).save();
+        (window as any).html2pdf().set({ margin: 10, filename: 'Teruel_Trip.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, ignoreElements: (e: any) => e.hasAttribute('data-html2canvas-ignore') }, jsPDF: { unit: 'mm', format: 'a4' }, pagebreak: { mode: ['avoid-all', 'css'] } }).from(element).save();
     } else {
         alert("PDF library not loaded.");
     }
   };
 
-  const shareText = encodeURIComponent(`${itinerary.title}\n${itinerary.description}`);
+  const shareText = encodeURIComponent(`${itinerary.title}\n${description}`);
   const currentUrl = encodeURIComponent(window.location.href);
 
   // Map Init
@@ -345,6 +346,15 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
                 <div class="text-xs text-gray-500 mb-2">${act.time} • ${act.priceEstimate}</div>
                 <p class="mb-2 text-gray-700">${act.description.substring(0, 100)}...</p>
                 <div id="comment-area-${index}" class="mt-2 border-t pt-2"></div>
+                <div id="details-toggle-${index}" class="mt-2 text-right">
+                    <button class="text-teruel-ochre text-xs font-bold underline">Show Details</button>
+                </div>
+                <div id="details-content-${index}" class="hidden mt-2 bg-gray-50 p-2 rounded text-xs">
+                     ${act.address ? `<p><strong>📍</strong> ${act.address}</p>` : ''}
+                     ${fetchedAddresses[getActivityKey(act)] ? `<p><strong>🚌</strong> ${fetchedAddresses[getActivityKey(act)]}</p>` : ''}
+                     ${act.type === 'TRAVEL' && act.transportDetails ? `<p><strong>🚌</strong> ${act.transportDetails}</p>` : ''}
+                     <button class="w-full mt-2 bg-teruel-green text-white py-1 rounded">View in List</button>
+                </div>
               </div>
             `;
 
@@ -371,10 +381,29 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
                 }
             };
             renderComments();
+            
+            // Detail Toggle
+            const toggleBtn = container.querySelector(`#details-toggle-${index} button`);
+            const detailsDiv = container.querySelector(`#details-content-${index}`);
+            const listBtn = container.querySelector(`#details-content-${index} button`);
+            if (toggleBtn && detailsDiv) {
+                toggleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    detailsDiv.classList.toggle('hidden');
+                    toggleBtn.textContent = detailsDiv.classList.contains('hidden') ? 'Show Details' : 'Hide Details';
+                });
+            }
+            if (listBtn) {
+                 listBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    onMarkerClick(index);
+                 });
+            }
 
             const marker = L.circleMarker([lat, lng], { radius: 8, fillColor: color, color: '#fff', weight: 2, fillOpacity: 0.9 }).addTo(markersLayer.current);
             marker.bindPopup(container);
-            marker.on('click', () => { /* Optional interactions */ });
+            // Click marker to open popup, don't auto scroll to list to prevent disorienting jumps
+            marker.on('click', () => { marker.openPopup(); });
         }
         lastCoords = { lat, lng };
     });
@@ -386,7 +415,7 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
     } else if (!hasCoordinates) {
        map.setView([40.345, -1.106], 9);
     }
-  }, [activities, filters, mapReady, currentMapStyle, dayNumber, comments, saveComment, searchQuery]);
+  }, [activities, filters, mapReady, currentMapStyle, dayNumber, comments, saveComment, searchQuery, fetchedAddresses, onMarkerClick]);
 
   return (
     <div className="flex flex-col h-full bg-teruel-stone min-h-[80vh]" id="itinerary-view-root">
@@ -398,7 +427,7 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
               </div>
         )}
 
-        <div className="bg-white p-4 shadow border-b sticky top-0 z-20 flex flex-wrap gap-4 justify-between items-center">
+        <div className="bg-white p-4 shadow border-b sticky top-0 z-20 flex flex-wrap gap-4 justify-between items-center" data-html2canvas-ignore="true">
             <div className="flex items-center gap-2">
                 <button onClick={onReset} className="font-bold text-teruel-dark">&larr; {t('view.back')}</button>
                 <h2 className="font-serif font-bold text-lg hidden md:block">{itinerary.title}</h2>
@@ -413,7 +442,7 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
                 {/* Actions */}
                 <button onClick={handlePdfExport} className="bg-gray-800 text-white px-3 py-1 rounded text-sm font-bold">PDF</button>
                 <button onClick={handleEmailShare} className="bg-teruel-green text-white px-3 py-1 rounded text-sm font-bold">Email</button>
-                <button onClick={() => onSave({ ...itinerary, userComments: comments })} className="bg-teruel-ochre text-white px-3 py-1 rounded text-sm font-bold">{t('view.save')}</button>
+                <button onClick={() => onSave({ ...itinerary, description, userComments: comments })} className="bg-teruel-ochre text-white px-3 py-1 rounded text-sm font-bold">{t('view.save')}</button>
             </div>
         </div>
 
@@ -424,21 +453,29 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
         </div>
 
         <div id="itinerary-content" className="flex-grow flex flex-col md:flex-row max-w-7xl mx-auto w-full relative">
-            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-[1000]">
+            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-[1000]" data-html2canvas-ignore="true">
                  <button onClick={() => setIsMapView(!isMapView)} className="bg-teruel-dark text-white border-2 border-teruel-ochre px-6 py-2 rounded-full shadow-xl font-bold md:hidden">
                     {isMapView ? t('view.show_list') : t('view.show_map')}
                  </button>
             </div>
 
             <div className={`w-full bg-teruel-stone p-4 overflow-y-auto ${isMapView ? 'hidden md:block md:w-0' : 'block md:w-1/2'}`}>
+                 <div className="mb-4">
+                     <textarea 
+                        value={description} 
+                        onChange={(e) => setDescription(e.target.value)} 
+                        className="w-full bg-transparent text-gray-700 text-sm italic border-b border-gray-300 focus:border-teruel-ochre focus:outline-none resize-none"
+                        rows={2}
+                     />
+                 </div>
                  <div className="flex justify-between items-center mb-4">
                      <h3 className="font-serif font-bold text-2xl text-teruel-red">{currentDay.title}</h3>
-                     <button onClick={() => setIsTourActive(true)} className="bg-teruel-red text-white px-3 py-1 rounded-full text-xs font-bold">{t('view.start_tour')}</button>
+                     <button onClick={() => setIsTourActive(true)} className="bg-teruel-red text-white px-3 py-1 rounded-full text-xs font-bold" data-html2canvas-ignore="true">{t('view.start_tour')}</button>
                  </div>
                  
                  <input type="text" className="w-full p-2 border rounded mb-3" placeholder={language === 'es' ? "Buscar..." : "Search..."} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                  
-                 <div className="flex gap-2 mb-4 text-xs">
+                 <div className="flex gap-2 mb-4 text-xs" data-html2canvas-ignore="true">
                      {Object.keys(filters).map(k => (
                          <button key={k} onClick={() => setFilters(p => ({...p, [k]: !p[k as any]}))} className={`px-2 py-1 rounded border ${filters[k as any] ? 'bg-gray-700 text-white' : 'bg-gray-200'}`}>{k}</button>
                      ))}
@@ -446,7 +483,7 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
 
                  <div className="space-y-4">
                     {activities.filter(a => filters[a.type] && (!searchQuery || a.placeName.toLowerCase().includes(searchQuery.toLowerCase()))).map((act, idx) => (
-                        <div key={idx} id={`activity-item-${idx}`} onClick={() => setExpandedActivities(p => ({...p, [idx]: !p[idx]}))} className="bg-white rounded shadow p-4 border-l-4 border-teruel-green cursor-pointer">
+                        <div key={idx} id={`activity-item-${idx}`} onClick={() => setExpandedActivities(p => ({...p, [idx]: !p[idx]}))} className="bg-white rounded shadow p-4 border-l-4 border-teruel-green cursor-pointer break-inside-avoid">
                             <div className="flex justify-between"><h4 className="font-bold">{act.placeName}</h4><span className="text-xs bg-gray-100 px-2 rounded">{act.time}</span></div>
                             <p className="text-sm text-gray-600 mt-1">{act.description}</p>
                             {expandedActivities[idx] && (
@@ -454,7 +491,7 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
                                     <p>💰 {act.priceEstimate}</p>
                                     {act.address && <p>📍 {act.address}</p>}
                                     {act.type === 'TRAVEL' && <p className="text-blue-600">🚌 {act.transportDetails || 'Transport'}</p>}
-                                    {(act.type === 'FOOD' || act.type === 'LODGING') && <a href={getReservationLink(act.placeName, act.type)} target="_blank" className="text-teruel-ochre font-bold block mt-1">Book Now ↗</a>}
+                                    {(act.type === 'FOOD' || act.type === 'LODGING') && <a href={getReservationLink(act.placeName, act.type)} target="_blank" className="text-teruel-ochre font-bold block mt-1" data-html2canvas-ignore="true">Book Now ↗</a>}
                                 </div>
                             )}
                         </div>
@@ -464,7 +501,7 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
 
             <div className={`w-full bg-gray-200 relative ${!isMapView ? 'hidden md:block md:w-1/2' : 'block h-[80vh]'}`}>
                 <div ref={mapContainer} className="w-full h-full" style={{ zIndex: 1 }}></div>
-                <div className="absolute top-4 right-4 z-[500] flex flex-col gap-2">
+                <div className="absolute top-4 right-4 z-[500] flex flex-col gap-2" data-html2canvas-ignore="true">
                     <button onClick={optimizeRoute} className="bg-white p-2 rounded shadow text-teruel-dark" title="Optimize Route">⚡</button>
                     <button onClick={handleFetchBusStops} className={`bg-white p-2 rounded shadow text-blue-600 ${fetchingBusStops ? 'animate-pulse' : ''}`} title="Find Bus Stops">🚌</button>
                     <div className="relative group">

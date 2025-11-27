@@ -53,33 +53,32 @@ const itinerarySchema = {
 };
 
 export const generateItinerary = async (prefs: UserPreferences): Promise<ItineraryResult> => {
-  // Explicitly check known variable names so bundlers (Vite/Webpack) can replace them statically.
-  // Dynamic access (process.env[key]) fails in modern bundlers.
   let apiKey = '';
 
+  // 1. Try Vite standard (Most likely for React on Render)
+  // Vite requires variables to start with VITE_ to be exposed to import.meta.env
   try {
-    // 1. Standard Node/Webpack check
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process.env) {
-      // @ts-ignore
-      apiKey = process.env.API_KEY || process.env.VITE_API_KEY || process.env.REACT_APP_API_KEY || process.env.VITE_GEMINI_API_KEY;
-    }
-  } catch (e) {}
-
-  // 2. Vite specific check (import.meta.env)
-  if (!apiKey) {
-    try {
-      // @ts-ignore
-      if (typeof import.meta !== 'undefined' && import.meta.env) {
+     // @ts-ignore
+     if (typeof import.meta !== 'undefined' && import.meta.env) {
         // @ts-ignore
-        apiKey = import.meta.env.API_KEY || import.meta.env.VITE_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
-      }
-    } catch (e) {}
+        apiKey = import.meta.env.VITE_API_KEY || import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.API_KEY;
+     }
+  } catch(e) {}
+
+  // 2. Try Node/Webpack standard (Fallback)
+  if (!apiKey) {
+      try {
+        // @ts-ignore
+        if (typeof process !== 'undefined' && process.env) {
+           // @ts-ignore
+           apiKey = process.env.VITE_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY || process.env.REACT_APP_API_KEY;
+        }
+      } catch(e) {}
   }
 
   if (!apiKey) {
-      console.error("API Key check failed. Ensure variables are set in Render/Vite.");
-      throw new Error("Configuration Error: API Key not configured. Please ensure 'API_KEY' (or 'VITE_API_KEY') is set in your environment variables.");
+      console.error("API Key check failed. Ensure variables are set in Render/Vite as VITE_API_KEY.");
+      throw new Error("Configuration Error: API Key not configured. Please set 'VITE_API_KEY' in your environment variables.");
   }
 
   // Initialize client inside function to avoid top-level side effects
