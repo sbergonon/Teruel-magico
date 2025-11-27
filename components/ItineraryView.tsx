@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-// import L from 'leaflet'; // REMOVED to avoid ESM conflict
 import { ItineraryResult, Activity } from '../types';
 import { useLanguage } from '../context/LanguageContext';
-
-// Access global Leaflet instance
-const L = (window as any).L;
 
 // Map Style Configuration
 type MapStyle = 'standard' | 'satellite' | 'terrain' | 'light';
@@ -251,6 +247,7 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
 
   // Initialize Map Structure (Containers)
   useEffect(() => {
+    const L = (window as any).L; // Access globally here to be safe
     if (mapContainer.current && !mapInstance.current) {
         if (!L) return; // Wait for Leaflet to load
         
@@ -280,7 +277,8 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
 
   // Handle Map Tile Layer Changes
   useEffect(() => {
-    if (!mapInstance.current || !mapReady) return;
+    const L = (window as any).L;
+    if (!mapInstance.current || !mapReady || !L) return;
 
     const styleConfig = MAP_STYLES[currentMapStyle];
     
@@ -303,7 +301,8 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
 
   // Marker/Route rendering
   useEffect(() => {
-    if (!mapInstance.current || !mapReady) return;
+    const L = (window as any).L;
+    if (!mapInstance.current || !mapReady || !L) return;
     const map = mapInstance.current;
     
     // Safety check for map container visibility updates
