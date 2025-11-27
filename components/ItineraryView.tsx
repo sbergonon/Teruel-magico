@@ -151,13 +151,6 @@ const TourOverlay: React.FC<TourOverlayProps> = ({ dayTitle, activities, onClose
     return () => stopSpeaking();
   }, []);
 
-  // Auto-read on step change (optional, keeping manual for now)
-  useEffect(() => {
-     // Uncomment to auto-play:
-     // const textToRead = `${currentActivity.placeName}. ${currentActivity.description}`;
-     // speak(textToRead);
-  }, [currentStep]);
-
   return (
     <div className="fixed inset-0 z-[2000] bg-teruel-dark/95 text-white flex flex-col items-center justify-center p-6 animate-fade-in">
       <button 
@@ -275,6 +268,10 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
   // Tour Mode
   const [isTourActive, setIsTourActive] = useState(false);
 
+  // Bus stop fetching state
+  const [fetchingBusStops, setFetchingBusStops] = useState(false);
+  const [fetchedAddresses, setFetchedAddresses] = useState<Record<string, string>>({});
+
   // Map refs - initialized as any to handle missing L types
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -305,7 +302,6 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
   const activities = currentDay.activities || []; // Default to empty array
   const hasCoordinates = activities.some(a => a.coordinates);
 
-  const fetchedAddresses: Record<string, string> = {}; // Placeholder for geocoding results
 
   // Monitor online status
   useEffect(() => {
@@ -377,6 +373,82 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
       // Auto-save the comment to storage by updating the itinerary
       onSave({ ...itinerary, userComments: newComments });
   }, [dayNumber, comments, itinerary, onSave]);
+
+  const handleFetchBusStops = async () => {
+    setFetchingBusStops(true);
+    const newAddresses = { ...fetchedAddresses };
+    
+    // Find travel activities with coordinates but no address
+    const targets = activities.filter(a => a.type === 'TRAVEL' && a.coordinates && !a.address);
+    
+    for (const act of targets) {
+        if (!act.coordinates) continue;
+        try {
+            // Overpass API query for nearby bus stops (500m radius)
+            const query = `
+                [out:json];
+                node["highway"="bus_stop"](around:500,${act.coordinates.lat},${act.coordinates.lng});
+                out body;
+            `;
+            const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+            const data = await response.json();
+            
+            if (data.elements && data.elements.length > 0) {
+                // Get closest or first
+                const stop = data.elements[0];
+                const name = stop.tags.name || 'Bus Stop';
+                newAddresses[getActivityKey(act)] = `${name} (Detected)`;
+            }
+        } catch (e) {
+            console.error("Bus stop fetch error", e);
+        }
+    }
+    
+    setFetchedAddresses(newAddresses);
+    setFetchingBusStops(false);
+  };
+
+  const optimizeRoute = () => {
+    if (activities.length < 3) return;
+    
+    // Simple nearest neighbor sort starting from first activity
+    const sorted = [...activities];
+    const first = sorted.shift();
+    if (!first) return;
+
+    const result = [first];
+    let current = first;
+    
+    while(sorted.length > 0) {
+        let nearestIdx = -1;
+        let minDist = Infinity;
+        
+        sorted.forEach((act, idx) => {
+            if (current.coordinates && act.coordinates) {
+                const dist = getDistanceFromLatLonInKm(current.coordinates.lat, current.coordinates.lng, act.coordinates.lat, act.coordinates.lng);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestIdx = idx;
+                }
+            }
+        });
+        
+        if (nearestIdx !== -1) {
+            current = sorted[nearestIdx];
+            result.push(current);
+            sorted.splice(nearestIdx, 1);
+        } else {
+             // No coords or leftover
+             result.push(...sorted);
+             break;
+        }
+    }
+    
+    // Update the itinerary in memory (this needs to prop up to be permanent, but for view we simulate)
+    const newDay = { ...currentDay, activities: result };
+    const newDays = itinerary.days.map(d => d.dayNumber === dayNumber ? newDay : d);
+    onSave({ ...itinerary, days: newDays });
+  };
 
   const handleEmailShare = () => {
       const subject = `${t('view.share_subject') || 'Mi Viaje a Teruel'}: ${itinerary.title}`;
@@ -1086,9 +1158,28 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
             `}>
                 <div ref={mapContainer} className="w-full h-full min-h-[400px]" style={{ zIndex: 1 }}></div>
                 
-                {/* Map Controls (Layers + WiFi) */}
+                {/* Advanced Map Controls Container */}
                 <div className="absolute top-4 right-4 z-[500] flex flex-col items-end gap-2">
                     
+                    {/* Optimize Route Button */}
+                    <button 
+                        onClick={optimizeRoute}
+                        className="bg-white p-2 rounded shadow-md hover:bg-gray-100 text-teruel-dark border border-gray-300 transition-colors flex items-center justify-center w-10 h-10 group relative"
+                        title={language === 'es' ? 'Optimizar Ruta' : 'Optimize Route'}
+                    >
+                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                    </button>
+
+                    {/* Bus Stop Button */}
+                    <button 
+                        onClick={handleFetchBusStops}
+                        disabled={fetchingBusStops}
+                        className={`bg-white p-2 rounded shadow-md hover:bg-gray-100 text-blue-600 border border-gray-300 transition-colors flex items-center justify-center w-10 h-10 ${fetchingBusStops ? 'animate-pulse' : ''}`}
+                        title={language === 'es' ? 'Buscar paradas de bus' : 'Find bus stops'}
+                    >
+                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                    </button>
+
                     {/* Wi-Fi Indicator */}
                     <div 
                         className={`p-2 rounded shadow-md bg-white border transition-colors ${
