@@ -1,18 +1,10 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import L from 'leaflet';
-// CSS is loaded via index.html to avoid import errors in this environment
+// import L from 'leaflet'; // REMOVED to avoid ESM conflict
 import { ItineraryResult, Activity } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 
-// Fix for Leaflet default icon issues in Webpack/React environments
-// @ts-ignore
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
-});
+// Access global Leaflet instance
+const L = (window as any).L;
 
 // Map Style Configuration
 type MapStyle = 'standard' | 'satellite' | 'terrain' | 'light';
@@ -109,12 +101,12 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showOfflineBanner, setShowOfflineBanner] = useState(true);
 
-  // Map refs
+  // Map refs - initialized as any to handle missing L types
   const mapContainer = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<L.Map | null>(null);
-  const markersLayer = useRef<L.LayerGroup | null>(null);
-  const tileLayerRef = useRef<L.TileLayer | null>(null);
-  const routeLayer = useRef<L.Polyline | null>(null);
+  const mapInstance = useRef<any>(null);
+  const markersLayer = useRef<any>(null);
+  const tileLayerRef = useRef<any>(null);
+  const routeLayer = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false);
   
   // Safeguard: Ensure itinerary.days exists and has content
@@ -238,9 +230,40 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
       window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
+  const handlePdfExport = () => {
+    const element = document.getElementById('itinerary-content');
+    const opt = {
+      margin: 10,
+      filename: `Teruel_Itinerary_${itinerary.title.replace(/\s+/g, '_')}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+    
+    // Check if html2pdf exists globally
+    if ((window as any).html2pdf) {
+        (window as any).html2pdf().set(opt).from(element).save();
+    } else {
+        alert("PDF generator not ready. Please wait or reload.");
+    }
+  };
+
   // Initialize Map Structure (Containers)
   useEffect(() => {
     if (mapContainer.current && !mapInstance.current) {
+        if (!L) return; // Wait for Leaflet to load
+        
+        // Fix Icon
+        if (L.Icon && L.Icon.Default) {
+             delete L.Icon.Default.prototype._getIconUrl;
+             L.Icon.Default.mergeOptions({
+                iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
+                iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+                shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+            });
+        }
+
         mapInstance.current = L.map(mapContainer.current).setView([40.345, -1.106], 13);
         
         markersLayer.current = L.layerGroup().addTo(mapInstance.current);
@@ -263,7 +286,8 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
     
     // Create new layer
     const newLayer = L.tileLayer(styleConfig.url, {
-        attribution: styleConfig.attribution
+        attribution: styleConfig.attribution,
+        crossOrigin: true // Important for PDF export
     });
 
     // Remove old layer if exists
@@ -630,7 +654,7 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
   }, [activities, filters, isOnline, onMarkerClick, t, fetchedAddresses, comments, dayNumber, saveComment, mapReady, language, searchQuery, currentMapStyle]);
 
   return (
-    <div className="flex flex-col h-full bg-teruel-stone min-h-[80vh]">
+    <div className="flex flex-col h-full bg-teruel-stone min-h-[80vh]" id="itinerary-view-root">
         {/* Offline Banner */}
         {!isOnline && showOfflineBanner && (
               <div className="bg-teruel-red text-white p-3 text-center text-sm font-bold flex justify-between items-center animate-fade-in shadow-md relative z-30">
@@ -658,7 +682,15 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
                     <h2 className="font-serif font-bold text-xl text-teruel-dark">{itinerary.title}</h2>
                     <p className="text-xs text-gray-500">{t('view.generated_on')} {new Date().toLocaleDateString()}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap justify-center">
+                    <button 
+                        onClick={handlePdfExport}
+                        className="bg-gray-800 text-white px-4 py-2 rounded-full text-sm font-bold shadow hover:bg-gray-700 flex items-center gap-1"
+                        title={t('view.pdf')}
+                    >
+                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        <span className="hidden sm:inline">PDF</span>
+                    </button>
                     <button 
                         onClick={handleEmailShare}
                         className="bg-teruel-green text-white px-4 py-2 rounded-full text-sm font-bold shadow hover:bg-green-700 flex items-center gap-1"
@@ -691,14 +723,15 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
             </div>
         </div>
 
-        {/* Content Grid */}
-        <div className="flex-grow flex flex-col md:flex-row max-w-7xl mx-auto w-full relative overflow-hidden">
+        {/* Content Grid (Wrapped in ID for PDF export if needed) */}
+        <div id="itinerary-content" className="flex-grow flex flex-col md:flex-row max-w-7xl mx-auto w-full relative overflow-hidden">
             
             {/* View Toggle Button (Floating) */}
             <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-[1000] pointer-events-auto">
                  <button
                     onClick={() => setIsMapView(!isMapView)}
                     className="bg-teruel-dark text-white border-2 border-teruel-ochre px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 hover:scale-105 transition-transform"
+                    data-html2canvas-ignore="true" // Ignore in PDF
                  >
                     {isMapView ? (
                         <>
