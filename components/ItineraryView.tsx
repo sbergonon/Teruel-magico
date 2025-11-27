@@ -70,6 +70,181 @@ const getReservationLink = (placeName: string, type: 'LODGING' | 'FOOD') => {
     return `https://www.google.com/search?q=reserva+${encodeURIComponent(placeName)}+Teruel`;
 };
 
+// --- AUDIO GUIDE COMPONENT ---
+interface TourOverlayProps {
+  dayTitle: string;
+  activities: Activity[];
+  onClose: () => void;
+}
+
+const TourOverlay: React.FC<TourOverlayProps> = ({ dayTitle, activities, onClose }) => {
+  const { t, language } = useLanguage();
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [rate, setRate] = useState(1);
+  
+  const currentActivity = activities[currentStep];
+  const synthesis = window.speechSynthesis;
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  const stopSpeaking = () => {
+    if (synthesis.speaking) {
+      synthesis.cancel();
+      setIsSpeaking(false);
+      setIsPaused(false);
+    }
+  };
+
+  const speak = (text: string) => {
+    stopSpeaking();
+    
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = language === 'es' ? 'es-ES' : 'en-US';
+    u.rate = rate;
+    
+    u.onend = () => {
+      setIsSpeaking(false);
+      setIsPaused(false);
+    };
+    
+    u.onerror = (e) => {
+      console.error("Speech error", e);
+      setIsSpeaking(false);
+    };
+
+    utteranceRef.current = u;
+    synthesis.speak(u);
+    setIsSpeaking(true);
+    setIsPaused(false);
+  };
+
+  const handlePlayPause = () => {
+    if (isSpeaking && !isPaused) {
+      synthesis.pause();
+      setIsPaused(true);
+    } else if (isPaused) {
+      synthesis.resume();
+      setIsPaused(false);
+    } else {
+      const textToRead = `${currentActivity.placeName}. ${currentActivity.description}`;
+      speak(textToRead);
+    }
+  };
+
+  const handleNext = () => {
+    stopSpeaking();
+    if (currentStep < activities.length - 1) {
+      setCurrentStep(prev => prev + 1);
+    }
+  };
+
+  const handlePrev = () => {
+    stopSpeaking();
+    if (currentStep > 0) {
+      setCurrentStep(prev => prev - 1);
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => stopSpeaking();
+  }, []);
+
+  // Auto-read on step change (optional, keeping manual for now)
+  useEffect(() => {
+     // Uncomment to auto-play:
+     // const textToRead = `${currentActivity.placeName}. ${currentActivity.description}`;
+     // speak(textToRead);
+  }, [currentStep]);
+
+  return (
+    <div className="fixed inset-0 z-[2000] bg-teruel-dark/95 text-white flex flex-col items-center justify-center p-6 animate-fade-in">
+      <button 
+        onClick={onClose} 
+        className="absolute top-6 right-6 text-gray-400 hover:text-white"
+        title={t('tour.close')}
+      >
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+
+      <div className="max-w-2xl w-full text-center space-y-8">
+        <div>
+          <h3 className="text-teruel-ochre text-sm font-bold uppercase tracking-widest mb-2">
+            {dayTitle} &bull; {t('tour.step')} {currentStep + 1} {t('tour.of')} {activities.length}
+          </h3>
+          <h2 className="text-3xl md:text-5xl font-serif font-bold mb-6 leading-tight">
+            {currentActivity.placeName}
+          </h2>
+          <div className="inline-block bg-teruel-red px-3 py-1 rounded text-sm font-bold mb-8">
+            {currentActivity.time}
+          </div>
+        </div>
+
+        <p className="text-xl md:text-2xl font-light leading-relaxed text-gray-200">
+          {currentActivity.description}
+        </p>
+
+        {/* Audio Controls */}
+        <div className="flex flex-col items-center gap-4 bg-white/10 p-6 rounded-xl">
+           <div className="flex items-center gap-6">
+              <button 
+                onClick={handlePlayPause}
+                className="w-16 h-16 rounded-full bg-teruel-ochre text-teruel-dark flex items-center justify-center hover:scale-105 transition-transform shadow-lg"
+              >
+                {isSpeaking && !isPaused ? (
+                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>
+                ) : (
+                  <svg className="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                )}
+              </button>
+              <button
+                onClick={stopSpeaking}
+                className="w-12 h-12 rounded-full border-2 border-gray-400 text-gray-300 flex items-center justify-center hover:bg-white/10"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+              </button>
+           </div>
+           
+           <div className="flex items-center gap-2 w-full max-w-xs">
+              <span className="text-xs text-gray-400">{t('tour.speed')}</span>
+              <input 
+                type="range" 
+                min="0.5" 
+                max="2" 
+                step="0.1" 
+                value={rate} 
+                onChange={(e) => setRate(parseFloat(e.target.value))}
+                className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+              />
+              <span className="text-xs font-mono w-8">{rate}x</span>
+           </div>
+        </div>
+
+        <div className="flex justify-between items-center w-full pt-8 border-t border-gray-700">
+          <button 
+            onClick={handlePrev} 
+            disabled={currentStep === 0}
+            className={`flex items-center gap-2 text-lg font-bold ${currentStep === 0 ? 'text-gray-600 cursor-not-allowed' : 'text-white hover:text-teruel-ochre'}`}
+          >
+            &larr; {t('tour.prev')}
+          </button>
+          
+          <button 
+            onClick={handleNext}
+            disabled={currentStep === activities.length - 1}
+            className={`flex items-center gap-2 text-lg font-bold ${currentStep === activities.length - 1 ? 'text-gray-600 cursor-not-allowed' : 'text-white hover:text-teruel-ochre'}`}
+          >
+            {t('tour.next')} &rarr;
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+// -----------------------------
+
+
 export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset, onSave }) => {
   const { t, language } = useLanguage();
   const [dayNumber, setDayNumber] = useState<number>(1);
@@ -96,6 +271,9 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
   // Offline State
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showOfflineBanner, setShowOfflineBanner] = useState(true);
+
+  // Tour Mode
+  const [isTourActive, setIsTourActive] = useState(false);
 
   // Map refs - initialized as any to handle missing L types
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -654,6 +832,15 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
 
   return (
     <div className="flex flex-col h-full bg-teruel-stone min-h-[80vh]" id="itinerary-view-root">
+        {/* Tour Overlay */}
+        {isTourActive && (
+           <TourOverlay 
+             dayTitle={currentDay.title} 
+             activities={activities.filter(a => filters[a.type])} // Only narrate filtered
+             onClose={() => setIsTourActive(false)} 
+           />
+        )}
+
         {/* Offline Banner */}
         {!isOnline && showOfflineBanner && (
               <div className="bg-teruel-red text-white p-3 text-center text-sm font-bold flex justify-between items-center animate-fade-in shadow-md relative z-30">
@@ -755,9 +942,18 @@ export const ItineraryView: React.FC<ItineraryViewProps> = ({ itinerary, onReset
                 <div className="mb-4">
                      <div className="flex justify-between items-center mb-2">
                          <h3 className="font-serif font-bold text-2xl text-teruel-red">{currentDay.title}</h3>
-                         <button onClick={collapseAll} className="text-xs text-teruel-red underline font-bold hover:text-teruel-dark transition-colors">
-                            {t('view.collapse_all')}
-                         </button>
+                         <div className="flex gap-2">
+                             <button 
+                                onClick={() => setIsTourActive(true)}
+                                className="text-xs text-white bg-teruel-red px-2 py-1 rounded-full font-bold hover:bg-red-800 transition-colors flex items-center gap-1"
+                             >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                                {t('view.start_tour')}
+                             </button>
+                             <button onClick={collapseAll} className="text-xs text-teruel-red underline font-bold hover:text-teruel-dark transition-colors">
+                                {t('view.collapse_all')}
+                             </button>
+                         </div>
                      </div>
                      
                      {/* Search Bar */}
